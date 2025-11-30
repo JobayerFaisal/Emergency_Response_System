@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: disaster_pg
+    environment:
+      POSTGRES_DB: disaster_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: disaster_redis
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    container_name: disaster_backend
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/disaster_db
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    # optional: reload in dev
+    volumes:
+      - ./backend:/app
+
+volumes:
+  pgdata:
