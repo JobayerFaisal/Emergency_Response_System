@@ -35,11 +35,11 @@ async def websocket_dispatches(websocket: WebSocket):
             # In your real application, you'll get dispatches from Redis and send that
             dispatch = {
                 "team_id": "T1",
-                "team_name": "Boat Team 1",
+                "team_name": "Boat Team 100",
                 "target_lat": 23.8103,
                 "target_lon": 90.4125,
-                "requester_name": "Fahim",
-                "requester_phone": "01700000000",
+                "requester_name": "Jobayer Faisal Fahim ",
+                "requester_phone": "0170003300000",
                 "details": "Water rising fast, need boat."
             }
             # Send the dispatch data to the connected WebSocket clients

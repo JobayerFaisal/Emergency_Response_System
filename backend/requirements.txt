@@ -10,3 +10,14 @@ geoalchemy2
 
 pydantic-settings
 python-dotenv
+asyncpg
+
+openai
+requests
+pandas
+websockets
+httpx
+# fastapi-websockets
+
+aiohttp
+tweepy
