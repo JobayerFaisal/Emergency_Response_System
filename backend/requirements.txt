@@ -21,3 +21,6 @@ httpx
 
 aiohttp
 tweepy
+
+streamlit 
+streamlit-leaflet 

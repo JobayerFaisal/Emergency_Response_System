@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from app.core.redis_client import get_redis_client
 import json
 
-router = APIRouter()
+router = APIRouter() 
 
 redis_client = get_redis_client()
 

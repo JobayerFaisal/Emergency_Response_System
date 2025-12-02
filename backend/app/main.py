@@ -5,6 +5,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import logging
 import json
 import asyncio
+from fastapi.middleware.cors import CORSMiddleware
+
 
 from app.agents.ingestion.ingestion_agent import IngestionAgent
 from app.agents.dispatch import RescueDispatchAgent
@@ -12,6 +14,15 @@ from app.agents.dispatch import RescueDispatchAgent
 
 from app.api.v1.raw_incidents import router as raw_incidents_router
 from app.api.v1.rescue_requests import router as rescue_requests_router
+from app.api.v1 import environmental as environmental_router
+from app.api.v1 import weather_data as weather_data_router  # Import the weather data router
+
+
+# Update this to allow the frontend container to access the backend container
+origins = [
+    "http://disaster_frontend:3000",  # Allow frontend in Docker to access backend
+    "http://localhost:3000",           # Allow frontend on the host to access backend (for local testing)
+]
 
 
 # Create FastAPI app instance
@@ -20,6 +31,17 @@ app = FastAPI(title="Emergency Response Backend")
 # Initialize agents
 ingestion_agent = IngestionAgent()
 dispatch_agent = RescueDispatchAgent()
+
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # WebSocket connection for dispatch orders
 @app.websocket("/ws/dispatches")
@@ -91,4 +113,18 @@ app.include_router(
     rescue_requests_router,
     prefix="/api/v1/rescue-requests",
     tags=["rescue-requests"],
+)
+
+app.include_router(
+    environmental_router.router,
+    prefix="/api/v1/environmental",
+    tags=["environmental"],
+)
+
+
+# Include the weather data router
+app.include_router(
+    weather_data_router.router,  # Include the weather data router
+    prefix="/api/v1/weather-data",  # Base path for weather data
+    tags=["weather-data"],
 )

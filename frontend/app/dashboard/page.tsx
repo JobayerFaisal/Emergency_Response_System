@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import EnvironmentalPanel from "./components/EnvironmentalPanel";
 
 type DispatchOrder = {
   team_id: string;
@@ -176,50 +177,58 @@ export default function DashboardPage() {
         </form>
       </section>
 
-      {/* Right column: live dispatches */}
-      <section className="w-full md:flex-1 bg-white rounded-2xl shadow-md p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Live Dispatches</h2>
-          <span className="text-xs text-slate-600">{wsStatus}</span>
+      {/* Right column: live dispatches + environmental panel */}
+      <section className="w-full md:flex-1 flex flex-col gap-6">
+        {/* Live dispatches card */}
+        <div className="bg-white rounded-2xl shadow-md p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">Live Dispatches</h2>
+            <span className="text-xs text-slate-600">{wsStatus}</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="border px-2 py-1 text-left">Team</th>
+                  <th className="border px-2 py-1 text-left">Requester</th>
+                  <th className="border px-2 py-1 text-left">Phone</th>
+                  <th className="border px-2 py-1 text-left">Location</th>
+                  <th className="border px-2 py-1 text-left">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dispatches.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="border px-2 py-4 text-center text-slate-500"
+                    >
+                      No dispatches yet. Submit a rescue request to see it live.
+                    </td>
+                  </tr>
+                )}
+                {dispatches.map((d, index) => (
+                  <tr key={index} className="hover:bg-slate-50">
+                    <td className="border px-2 py-1">
+                      {d.team_id} – {d.team_name}
+                    </td>
+                    <td className="border px-2 py-1">{d.requester_name}</td>
+                    <td className="border px-2 py-1">{d.requester_phone}</td>
+                    <td className="border px-2 py-1">
+                      {d.target_lat.toFixed(4)}, {d.target_lon.toFixed(4)}
+                    </td>
+                    <td className="border px-2 py-1">{d.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm border">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="border px-2 py-1 text-left">Team</th>
-                <th className="border px-2 py-1 text-left">Requester</th>
-                <th className="border px-2 py-1 text-left">Phone</th>
-                <th className="border px-2 py-1 text-left">Location</th>
-                <th className="border px-2 py-1 text-left">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dispatches.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="border px-2 py-4 text-center text-slate-500"
-                  >
-                    No dispatches yet. Submit a rescue request to see it live.
-                  </td>
-                </tr>
-              )}
-              {dispatches.map((d, index) => (
-                <tr key={index} className="hover:bg-slate-50">
-                  <td className="border px-2 py-1">
-                    {d.team_id} – {d.team_name}
-                  </td>
-                  <td className="border px-2 py-1">{d.requester_name}</td>
-                  <td className="border px-2 py-1">{d.requester_phone}</td>
-                  <td className="border px-2 py-1">
-                    {d.target_lat.toFixed(4)}, {d.target_lon.toFixed(4)}
-                  </td>
-                  <td className="border px-2 py-1">{d.details}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Environmental predictions card */}
+        <div className="bg-white rounded-2xl shadow-md p-6">
+          <EnvironmentalPanel />
         </div>
       </section>
     </main>
