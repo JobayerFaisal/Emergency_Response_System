@@ -24,3 +24,5 @@ tweepy
 
 streamlit 
 streamlit-leaflet 
+
+geopy
