@@ -1,0 +1,74 @@
+
+
+
+
+
+
+
+
+
+##################################################################################################
+
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: disaster_pg
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: disaster_redis
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    container_name: disaster_backend
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  environmental_agent:
+    build: ./backend
+    container_name: environmental_agent
+    command: python app/agents/agent_1_environmental/main.py
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MONITORING_INTERVAL: ${MONITORING_INTERVAL}
+      ENABLE_ADAPTIVE_POLLING: ${ENABLE_ADAPTIVE_POLLING}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app
+
+volumes:
+  pgdata:
