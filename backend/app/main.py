@@ -16,7 +16,7 @@ from app.api.v1.raw_incidents import router as raw_incidents_router
 from app.api.v1.rescue_requests import router as rescue_requests_router
 from app.api.v1 import environmental as environmental_router
 from app.api.v1 import weather_data as weather_data_router  # Import the weather data router
-
+from app.api.v1.chat import router as chat_router
 
 # Update this to allow the frontend container to access the backend container
 origins = [
@@ -128,3 +128,11 @@ app.include_router(
     prefix="/api/v1/weather-data",  # Base path for weather data
     tags=["weather-data"],
 )
+
+app.include_router(
+    chat_router,                # Include the chat router
+    prefix="/api/v1/chat",      # Base path for chat
+    tags=["Responder Chat"],    # Tag for the chat endpoints
+)
+
+
