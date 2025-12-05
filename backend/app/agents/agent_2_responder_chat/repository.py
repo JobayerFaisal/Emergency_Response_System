@@ -1,4 +1,4 @@
-# path: backend/app/agents/agent_2_responder_chat/repository.py
+# backend/app/agents/agent_2_responder_chat/repository.py
 
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.sql import func

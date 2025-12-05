@@ -1,31 +1,30 @@
-# path: backend/streamlit_app/pages/7_Responder_Chat.py
+# backend/streamlit_app/pages/7_Responder_Chat.py
 
 import streamlit as st
 import asyncio
 import websockets
 
-st.title("Responder Chat Agent")
+st.title("🚨 Responder Chat Assistant")
 
 responder_id = st.text_input("Responder ID", "resp-001")
 
-if "chat" not in st.session_state:
-    st.session_state.chat = []
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-async def chat_loop():
+async def chat_ws_send(msg: str):
     uri = f"ws://localhost:8000/api/v1/chat/{responder_id}"
-
     async with websockets.connect(uri) as ws:
-        while True:
-            user_msg = st.chat_input("Message")
-            if user_msg:
-                st.session_state.chat.append(("user", user_msg))
-                await ws.send(user_msg)
+        await ws.send(msg)
+        reply = await ws.recv()
+        return reply
 
-                bot_reply = await ws.recv()
-                st.session_state.chat.append(("assistant", bot_reply))
-                st.rerun()
+user_msg = st.chat_input("Type your message")
 
-for role, msg in st.session_state.chat:
+if user_msg:
+    st.session_state.messages.append(("user", user_msg))
+    reply = asyncio.run(chat_ws_send(user_msg))
+    st.session_state.messages.append(("assistant", reply))
+    st.rerun()
+
+for role, msg in st.session_state.messages:
     st.chat_message(role).write(msg)
-
-asyncio.run(chat_loop())

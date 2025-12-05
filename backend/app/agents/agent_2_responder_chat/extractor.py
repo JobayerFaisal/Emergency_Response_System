@@ -1,21 +1,63 @@
-# path: backend/app/agents/agent_2_responder_chat/extractor.py
+# backend/app/agents/agent_2_responder_chat/extractor.py
 
 import json
 import re
 from openai import OpenAI
 from app.agents.agent_2_responder_chat.schema import DistressUpdate
 
-# Typed message imports required for SDK 2.9.0
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam
+    ChatCompletionUserMessageParam,
 )
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-from openai.types.chat.chat_completion_content_part_text_param import ChatCompletionContentPartTextParam
+from openai.types.chat.chat_completion_content_part_text_param import (
+    ChatCompletionContentPartTextParam,
+)
 
 client = OpenAI()
 
-SYSTEM_PROMPT = """
+def normalize_extracted(parsed: dict):
+    result = {}
+
+    # people
+    people = parsed.get("people")
+    if isinstance(people, int):
+        result["people"] = {"count": people}
+    elif isinstance(people, dict):
+        result["people"] = people
+    else:
+        result["people"] = None
+
+    # needs
+    needs = parsed.get("needs")
+    if isinstance(needs, list):
+        result["needs"] = {"items": needs}
+    elif isinstance(needs, dict):
+        result["needs"] = needs
+    else:
+        result["needs"] = None
+
+    # hazards
+    hazards = parsed.get("hazards")
+    result["hazards"] = hazards if isinstance(hazards, list) else []
+
+    # urgency
+    result["urgency"] = parsed.get("urgency")
+
+    # confidence → numeric
+    conf = parsed.get("confidence")
+    if isinstance(conf, (int, float)):
+        result["confidence"] = float(conf)
+    elif isinstance(conf, str):
+        mapping = {"high": 0.9, "medium": 0.5, "low": 0.2}
+        result["confidence"] = mapping.get(conf.lower(), None)
+    else:
+        result["confidence"] = None
+
+    return result
+
+
+EXTRACTOR_SYSTEM_PROMPT = """
 Extract ONLY actionable emergency information from a responder message.
 Output STRICT JSON with exactly these fields:
 - people
@@ -29,75 +71,56 @@ If no information is extractable, return {}.
 
 class ExtractorAgent:
 
-    def _safe_read_text(self, content):
-        """
-        Extracts text safely from OpenAI typed message content.
-        Handles: None, strings, and list[ContentPartText].
-        """
+    def _extract_text(self, content):
         if content is None:
             return ""
-
-        # Text-only response as string
         if isinstance(content, str):
             return content.strip()
-
-        # New SDK format: list of content blocks
         if isinstance(content, list):
             combined = ""
-            for part in content:
-                if hasattr(part, "text") and part.text:
-                    combined += part.text
-                elif isinstance(part, dict) and "text" in part:
-                    combined += part["text"]
+            for c in content:
+                if hasattr(c, "text") and c.text:
+                    combined += c.text
             return combined.strip()
-
         return str(content).strip()
 
     def extract(self, responder_id: str, message: str):
-
-        # Build messages using typed parameters
         messages: list[ChatCompletionMessageParam] = [
             ChatCompletionSystemMessageParam(
                 role="system",
-                content=[ChatCompletionContentPartTextParam(type="text", text=SYSTEM_PROMPT)]
+                content=[ChatCompletionContentPartTextParam(type="text", text=EXTRACTOR_SYSTEM_PROMPT)]
             ),
             ChatCompletionUserMessageParam(
                 role="user",
                 content=[ChatCompletionContentPartTextParam(type="text", text=message)]
-            )
+            ),
         ]
 
-        # Call OpenAI Chat Completion
         response = client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=messages,
             temperature=0
         )
 
-        # Extract model output safely
-        msg = response.choices[0].message
-        raw_output = self._safe_read_text(msg.content)
-
-        if not raw_output:
+        raw = self._extract_text(response.choices[0].message.content)
+        if not raw:
             return None
 
-        # Try parsing strict JSON
         try:
-            parsed = json.loads(raw_output)
+            parsed = json.loads(raw)
         except:
-            # fallback scan for { ... }
-            m = re.search(r"\{.*\}", raw_output, re.DOTALL)
-            if not m:
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if not match:
                 return None
-            parsed = json.loads(m.group(0))
+            parsed = json.loads(match.group(0))
 
-        # If extraction indicates no actionable info:
         if parsed == {}:
             return None
 
-        # Build Pydantic model
+        normalized = normalize_extracted(parsed)
+
         return DistressUpdate(
             responder_id=responder_id,
             raw_message=message,
-            **parsed
+            **normalized
         )
