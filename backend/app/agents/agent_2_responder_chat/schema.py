@@ -1,14 +1,14 @@
 # backend/app/agents/agent_2_responder_chat/schema.py
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 
 class DistressUpdate(BaseModel):
     responder_id: str
     raw_message: str
 
-    people: Optional[object] = None
-    needs: Optional[object] = None
-    hazards: Optional[List[str]] = []
+    people: Optional[Any] = None
+    needs: Optional[Any] = None
+    hazards: Optional[List[str]] = None  # ← FIXED (no mutable default)
     urgency: Optional[str] = None
-    confidence: Optional[object] = None
+    confidence: Optional[Any] = None

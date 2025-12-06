@@ -10,6 +10,8 @@ import logging
 import json
 
 # Routers
+from app.core.db import Base, engine
+
 from app.api.v1.raw_incidents import router as raw_incidents_router
 from app.api.v1.rescue_requests import router as rescue_requests_router
 from app.api.v1 import environmental as environmental_router
@@ -37,12 +39,51 @@ origins = [
 # ------------------------------------------------------------------------------
 # Lifespan manager (modern FastAPI startup/shutdown)
 # ------------------------------------------------------------------------------
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     """
+#     A modern replacement for deprecated @app.on_event("startup").
+#     Ensures background agents start and safely stop.
+#     """
+#     ingestion_agent = IngestionAgent()
+#     dispatch_agent = RescueDispatchAgent()
+
+#     logging.info("[main] Starting ingestion agent...")
+#     ingestion_agent.start()
+
+#     logging.info("[main] Starting dispatch agent...")
+#     dispatch_agent.start()
+
+#     # Available to app state if needed
+#     app.state.ingestion_agent = ingestion_agent
+#     app.state.dispatch_agent = dispatch_agent
+
+#     yield  # Application runs here
+
+#     logging.info("[main] Stopping ingestion agent...")
+#     ingestion_agent.stop()
+
+#     logging.info("[main] Stopping dispatch agent...")
+#     dispatch_agent.stop()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     A modern replacement for deprecated @app.on_event("startup").
     Ensures background agents start and safely stop.
+    Also ensures database tables are created on startup.
     """
+
+    # ---- CREATE DATABASE TABLES HERE ----
+    try:
+        print("[main] Creating database tables...")
+        Base.metadata.create_all(bind=engine)
+        print("[main] ✔ Database tables initialized")
+    except Exception as e:
+        print("[main] ❌ Failed to create tables:", e)
+
+    # ---- START AGENTS ----
     ingestion_agent = IngestionAgent()
     dispatch_agent = RescueDispatchAgent()
 
@@ -52,17 +93,29 @@ async def lifespan(app: FastAPI):
     logging.info("[main] Starting dispatch agent...")
     dispatch_agent.start()
 
-    # Available to app state if needed
     app.state.ingestion_agent = ingestion_agent
     app.state.dispatch_agent = dispatch_agent
 
-    yield  # Application runs here
+    yield   # Application runs here
 
+    # ---- STOP AGENTS ----
     logging.info("[main] Stopping ingestion agent...")
     ingestion_agent.stop()
 
     logging.info("[main] Stopping dispatch agent...")
     dispatch_agent.stop()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ------------------------------------------------------------------------------
