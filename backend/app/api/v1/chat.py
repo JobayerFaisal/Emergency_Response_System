@@ -65,7 +65,11 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
             if structured:
                 logging.info(f"[chat] Extracted structured report: {structured.json()}")
 
-                # Publish asynchronously to Redis
+                # 1️⃣ Save to PostgreSQL
+                from app.agents.agent_2_responder_chat.repository import save_emergency_report
+                await asyncio.to_thread(save_emergency_report, db, structured)
+
+                # 2️⃣ Publish to Redis
                 try:
                     await redis_client.publish("reports.raw", structured.json())
                 except Exception as e:

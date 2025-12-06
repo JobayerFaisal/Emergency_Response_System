@@ -15,6 +15,9 @@ from app.api.v1.rescue_requests import router as rescue_requests_router
 from app.api.v1 import environmental as environmental_router
 from app.api.v1 import weather_data as weather_data_router
 from app.api.v1.chat import router as chat_router
+from app.api.v1 import emergency_reports as emergency_reports_router
+
+
 
 # Agents
 from app.agents.ingestion.ingestion_agent import IngestionAgent
@@ -157,3 +160,11 @@ app.include_router(
     prefix="/api/v1/chat",
     tags=["Responder Chat"],
 )
+
+app.include_router(
+    emergency_reports_router.router,
+    prefix="/api/v1/emergency-reports",
+    tags=["Emergency Reports"],
+)
+
+# ------------------------------------------------------------------------------
