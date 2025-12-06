@@ -1,2 +1,0 @@
-"postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
-
