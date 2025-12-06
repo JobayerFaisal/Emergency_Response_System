@@ -6,7 +6,9 @@ import json
 async def get_predictions():
     # Connect to database
     conn = await asyncpg.connect(
-        'postgresql://postgres:postgres@localhost:5432/disaster_db'
+        # 'postgresql://postgres:postgres@localhost:5432/disaster_db'
+        "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
+
     )
     
     # Query predictions

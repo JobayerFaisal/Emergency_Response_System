@@ -26,7 +26,7 @@ services:
       - db
       - redis
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/disaster_db
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@host.docker.internal:5432/disaster_db
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"

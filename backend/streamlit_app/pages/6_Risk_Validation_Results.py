@@ -6,7 +6,7 @@ import pandas as pd
 
 DATABASE_URL = os.getenv(
     "ENV_DB_URL",
-    "postgresql://postgres:postgres@localhost:5432/disaster_db"
+    "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
 )
 
 # ---------------------------

@@ -16,7 +16,8 @@ from utils.validation_checker import process_pending_validations
 
 DATABASE_URL = os.getenv(
     "ENV_DB_URL",
-    "postgresql://postgres:postgres@localhost:5432/disaster_db"
+    "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
+
 )
 
 # Auto-refresh every 10 seconds
