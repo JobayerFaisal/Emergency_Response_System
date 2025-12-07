@@ -123,25 +123,28 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
     logging.info(f"[chat] WebSocket connected → responder_id={responder_id}")
 
     db = SessionLocal()
+    DEFAULT_LAT = 23.8103
+    DEFAULT_LNG = 90.4125
+
 
     try:
         while True:
             # ------------------------------------------------------------
-            # 1️⃣ Receive message (plain text or JSON)
+            # 1️⃣ Receive and parse message
             # ------------------------------------------------------------
             try:
                 raw = await websocket.receive_text()
                 logging.info(f"[chat] Received raw from {responder_id}: {raw}")
 
+                # Try to parse JSON; fallback to plain text
                 try:
-                    data = json.loads(raw)  # Expecting {"message": "...", "location": {...}}
+                    data = json.loads(raw)
                 except:
                     data = {"message": raw}
 
                 message = data.get("message")
-                loc = data.get("location") or {}
 
-                # Location may be missing, null, or a string → ensure it's a dict
+                # Extract location
                 loc = data.get("location")
                 if isinstance(loc, dict):
                     lat = loc.get("lat")
@@ -149,6 +152,12 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
                 else:
                     lat = None
                     lng = None
+
+                # Apply default coords if missing
+                if lat is None or lng is None:
+                    lat = DEFAULT_LAT
+                    lng = DEFAULT_LNG
+                    logging.info("[chat] No location provided → using default coordinates")
 
                 logging.info(f"[chat] Parsed message={message}, lat={lat}, lng={lng}")
 
@@ -162,7 +171,7 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
                 continue
 
             # ------------------------------------------------------------
-            # 2️⃣ Save incoming user message + location
+            # 2️⃣ Save incoming user message
             # ------------------------------------------------------------
             try:
                 db.add(ChatMessage(
@@ -177,9 +186,8 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
                 logging.error(f"[chat] DB save failed: {e}")
 
             # ------------------------------------------------------------
-            # 3️⃣ Generate AI reply (sync call → thread)
+            # 3️⃣ Generate AI reply
             # ------------------------------------------------------------
-            # Ensure message is always a string (OpenAI requires str)
             safe_message = message if isinstance(message, str) else ""
 
             reply = await asyncio.to_thread(
@@ -189,15 +197,12 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
                 safe_message
             )
 
-            # Send reply to frontend
             await websocket.send_text(reply)
             logging.info(f"[chat] Sent AI reply to {responder_id}")
 
             # ------------------------------------------------------------
             # 4️⃣ Extract structured emergency information
             # ------------------------------------------------------------
-            safe_message = message if isinstance(message, str) else ""
-
             structured = await asyncio.to_thread(
                 extractor_agent.extract,
                 responder_id,
@@ -207,19 +212,19 @@ async def chat_socket(websocket: WebSocket, responder_id: str):
             if structured:
                 logging.info(f"[chat] Extracted structured report: {structured.json()}")
 
-                # Save extracted report in DB
+                # Save extracted emergency report
                 try:
                     await asyncio.to_thread(save_emergency_report, db, structured)
                 except Exception as e:
                     logging.error(f"[chat] Error saving emergency report: {e}")
 
-                # Publish to Redis (for agents)
+                # Publish to Redis channel
                 try:
                     await redis_client.publish("reports.raw", structured.json())
                 except Exception as e:
                     logging.error(f"[chat] Redis publish failed: {e}")
 
-        # End of loop → close client WS
+        # End of loop
         await websocket.close()
 
     finally:

@@ -8,7 +8,8 @@ router = APIRouter()
 
 DATABASE_URL = os.getenv(
     "ENV_DB_URL",
-    "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
+    # "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
+    "postgresql://postgres:postgres@db:5432/disaster_db"
 )
 
 QUERY = """
