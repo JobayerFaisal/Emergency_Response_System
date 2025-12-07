@@ -31,7 +31,7 @@ class ResponderChatAgent:
             return content.strip()
         return ""
 
-    def reply(self, db: Session, responder_id: str, message: str):
+    def reply(self, db: Session, responder_id: str, message: str, latitude=None, longitude=None):
 
         history = (
             db.query(ChatMessage)

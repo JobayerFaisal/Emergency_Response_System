@@ -12,6 +12,10 @@ class ChatMessage(Base):
     responder_id = Column(String, index=True)
     role = Column(String)
     message = Column(Text)
+
+    latitude = Column(Float, nullable=True)   # NEW
+    longitude = Column(Float, nullable=True)  # NEW
+
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -48,3 +52,4 @@ def save_emergency_report(db, report):
     db.commit()
     db.refresh(db_obj)
     return db_obj
+
