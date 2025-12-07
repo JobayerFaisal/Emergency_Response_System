@@ -8,7 +8,7 @@ import os
 DATABASE_URL = os.getenv(
     "ENV_DB_URL",
     # "postgresql://postgres:postgres@localhost:5432/disaster_db"
-    "postgresql+psycopg2://postgres:postgres@db:5432/disaster_db"
+    "postgresql://postgres:postgres@db:5432/disaster_db"
 )
 
 # Save report to DB

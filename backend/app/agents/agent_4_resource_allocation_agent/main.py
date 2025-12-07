@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from config import settings
-from redis_client import subscribe_to_reports
+from backend.app.agents.agent_4_resource_allocation_agent.redis_listener import subscribe_to_reports
 from polling import start_db_polling
 from logger import setup_logging
 
