@@ -5,3 +5,7 @@ DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/disaster_db
 
 ALTER TABLE chat_history ADD COLUMN latitude DOUBLE PRECISION;
 ALTER TABLE chat_history ADD COLUMN longitude DOUBLE PRECISION;
+
+
+
+docker-compose up -d

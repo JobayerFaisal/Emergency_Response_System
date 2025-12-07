@@ -7,8 +7,8 @@ import asyncio
 
 DATABASE_URL = os.getenv(
     "ENV_DB_URL",
-    # postgresql+psycopg2://postgres:postgres@db:5432/disaster_db
-    "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
+    "postgresql+psycopg2://postgres:postgres@db:5432/disaster_db"
+    # "postgresql://postgres:postgres@host.docker.internal:5432/disaster_db"
 )
 
 QUERY = """

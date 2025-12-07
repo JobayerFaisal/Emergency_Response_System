@@ -7,7 +7,21 @@ import asyncio
 import logging
 import json
 
-# Import routers
+# Force-load all model files so SQLAlchemy sees every table
+# from app.models import raw_incident
+# from app.models import rescue_request
+# from app.models import emergency_report
+# from app.models import weather_data
+# from app.models import environmental
+# from app.models import chat_history
+
+
+
+
+
+
+
+# Routers
 from app.api.v1.raw_incidents import router as raw_incidents_router
 from app.api.v1.rescue_requests import router as rescue_requests_router
 from app.api.v1 import environmental as environmental_router
@@ -19,25 +33,25 @@ from app.api.v1 import emergency_reports as emergency_reports_router
 from app.agents.ingestion.ingestion_agent import IngestionAgent
 from app.agents.dispatch import RescueDispatchAgent
 
-# DB imports
-from app.core.db import Base, engine   # <-- IMPORTANT
+# DB
+from app.core.db import Base, engine
 
 
 # -------------------------------------------------------------------
-# Modern FastAPI Lifespan Manager
+# Lifespan manager
 # -------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
     # ---------------------------------------------------------------
-    # CREATE DATABASE TABLES IF THEY DO NOT EXIST
+    # Create DB tables (ONLY once here)
     # ---------------------------------------------------------------
     try:
-        print("🌱 [DB] Checking and creating tables if missing...")
+        print("🌱 [DB] Initializing database tables...")
         Base.metadata.create_all(bind=engine)
-        print("✅ [DB] Database ready.")
+        print("✅ [DB] Tables created / already present.")
     except Exception as e:
-        print("❌ [DB] Failed to initialize database:", e)
+        print("❌ [DB] Failed to initialize tables:", e)
 
     # ---------------------------------------------------------------
     # Start background agents
@@ -54,11 +68,10 @@ async def lifespan(app: FastAPI):
     app.state.ingestion_agent = ingestion_agent
     app.state.dispatch_agent = dispatch_agent
 
-    # Hand control to FastAPI
     yield
 
     # ---------------------------------------------------------------
-    # Shutdown cleanup
+    # Cleanup on shutdown
     # ---------------------------------------------------------------
     logging.info("[main] Stopping ingestion agent...")
     ingestion_agent.stop()
@@ -68,7 +81,7 @@ async def lifespan(app: FastAPI):
 
 
 # -------------------------------------------------------------------
-# FastAPI Application Init
+# FastAPI Init
 # -------------------------------------------------------------------
 app = FastAPI(
     title="Emergency Response Backend",
@@ -77,13 +90,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # -------------------------------------------------------------------
 # CORS
 # -------------------------------------------------------------------
 origins = [
-    "http://localhost:8501",   # Streamlit
+    "http://localhost:8501",
     "http://127.0.0.1:8501",
-    "http://localhost:3000",   # Old React frontend (not used now)
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -96,7 +110,7 @@ app.add_middleware(
 
 
 # -------------------------------------------------------------------
-# WebSocket for live dispatch stream
+# WebSocket: Live Dispatch Stream
 # -------------------------------------------------------------------
 @app.websocket("/ws/dispatches")
 async def websocket_dispatches(websocket: WebSocket):
@@ -131,7 +145,7 @@ def health_check():
 
 
 # -------------------------------------------------------------------
-# Register all API Routers
+# Register API Routers
 # -------------------------------------------------------------------
 app.include_router(raw_incidents_router, prefix="/api/v1/raw-incidents", tags=["Raw Incidents"])
 app.include_router(rescue_requests_router, prefix="/api/v1/rescue-requests", tags=["Rescue Requests"])
