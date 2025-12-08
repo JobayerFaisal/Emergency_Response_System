@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional, Any, List, Tuple
 
-from models import (
+from app.agents.agent_1_environmental.models import (
     FloodPrediction, FloodRiskFactors, SentinelZone,
     SeverityLevel, AlertType, EnvironmentalAlert,
     WeatherData, SpatialAnalysisResult

@@ -1,25 +1,27 @@
 # fastapi
 # uvicorn[standard]
 
+datetime
+typing
+logging
+json
+uuid
+enum
+
+
+
+
 SQLAlchemy
-# psycopg2-binary
 alembic
 
-# redis
 geoalchemy2
 
-# pydantic-settings
-# python-dotenv
-# asyncpg
 
 openai
-# requests
-# pandas
+
 websockets
 httpx
-# fastapi-websockets
 
-# aiohttp
 tweepy
 
 streamlit 

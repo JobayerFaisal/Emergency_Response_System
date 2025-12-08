@@ -28,7 +28,7 @@ import asyncpg
 from redis import asyncio as aioredis
 
 # Internal imports
-from .models import (
+from app.agents.agent_1_environmental.models import (
     AgentOutput,
     SentinelZone,
     GeoPoint,

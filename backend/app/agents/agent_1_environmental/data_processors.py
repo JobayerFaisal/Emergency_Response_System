@@ -14,7 +14,10 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional, cast
 
-from models import WeatherData, PrecipitationData, WeatherCondition
+from app.agents.agent_1_environmental.models import (
+    WeatherData, PrecipitationData, WeatherCondition
+    )
+
 
 logger = logging.getLogger(__name__)
 

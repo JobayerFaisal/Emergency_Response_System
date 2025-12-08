@@ -1,3 +1,5 @@
+# path: backend/app/agents/agent_1_environmental/data_collectors.py
+
 """
 Data Collectors for Environmental Intelligence Agent (Weather-Only)
 ===================================================================
@@ -16,7 +18,8 @@ import aiohttp
 from aiohttp import ClientSession, ClientTimeout, ClientError
 from redis import asyncio as aioredis
 
-from models import (
+
+from app.agents.agent_1_environmental.models import (
     WeatherData, WeatherMetrics, PrecipitationData, WeatherCondition,
     GeoPoint, SentinelZone, DataSource
 )

@@ -20,10 +20,9 @@ from typing import Dict, List, Optional, Tuple, Any
 import asyncpg
 from asyncpg import Pool
 import json
-from models import WeatherData
 
 
-from models import (
+from app.agents.agent_1_environmental.models import (
     GeoPoint, BoundingBox, SentinelZone,
     WeatherData, SpatialAnalysisResult, SeverityLevel
 )
