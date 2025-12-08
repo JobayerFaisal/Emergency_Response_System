@@ -7,15 +7,6 @@ import asyncio
 import logging
 import json
 
-# Force-load all model files so SQLAlchemy sees every table
-# from app.models import raw_incident
-# from app.models import rescue_request
-# from app.models import emergency_report
-# from app.models import weather_data
-# from app.models import environmental
-# from app.models import chat_history
-
-
 
 
 
