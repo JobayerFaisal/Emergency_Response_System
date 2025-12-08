@@ -85,6 +85,31 @@ class EnvironmentalIntelligenceAgent:
 
         logger.info("Environmental Agent initialized (weather-only mode).")
 
+
+    async def shutdown(self):
+        """Gracefully stop environmental agent."""
+        self.running = False
+
+        # Close DB pool
+        if self.db_pool:
+            await self.db_pool.close()
+            self.db_pool = None
+
+        # Close Redis
+        if self.redis_client:
+            await self.redis_client.close()
+            self.redis_client = None
+
+        logging.info("Environmental Agent shut down successfully.")
+
+
+
+
+
+
+
+
+
     # --------------------------------------------------------------
     async def startup(self):
         logger.info("Starting Environmental Agent...")
