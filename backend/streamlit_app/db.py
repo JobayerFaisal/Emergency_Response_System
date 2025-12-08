@@ -33,3 +33,39 @@ async def fetch_weather(limit=100):
 
 def get_weather(limit=100):
     return asyncio.run(fetch_weather(limit))
+
+
+
+def get_weather_full(limit=200):
+    query = """
+        SELECT 
+            w.timestamp,
+            z.name AS zone_name,
+            ST_Y(w.location::geometry) AS latitude,
+            ST_X(w.location::geometry) AS longitude,
+            w.temperature,
+            w.humidity,
+            w.pressure,
+            w.wind_speed,
+            w.precipitation_1h AS precip_1h,
+            w.precipitation_3h AS precip_3h,
+            w.precipitation_24h AS precip_24h,
+            w.condition AS weather_condition,
+            w.raw_data
+        FROM weather_data w
+        JOIN sentinel_zones z ON w.zone_id = z.id
+        ORDER BY w.timestamp DESC
+        LIMIT $1;
+    """
+
+    try:
+        conn = asyncio.run(asyncpg.connect(DATABASE_URL))
+        rows = conn.fetch(query, limit)
+        conn.close()
+
+        df = pd.DataFrame([dict(r) for r in rows])
+        return df
+
+    except Exception as e:
+        print("DB Error:", e)
+        return pd.DataFrame()
