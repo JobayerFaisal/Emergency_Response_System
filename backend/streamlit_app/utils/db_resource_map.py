@@ -3,11 +3,6 @@ import pandas as pd
 import asyncio
 import os
 
-# DATABASE_URL = os.getenv(
-#     "ENV_DB_URL",
-#     "postgresql://postgres:postgres@localhost:5432/disaster_db"
-# )
-
 DATABASE_URL = os.getenv("ENV_DB_URL")
 
 
@@ -16,6 +11,18 @@ async def fetch_data(query: str):
     rows = await conn.fetch(query)
     await conn.close()
     return pd.DataFrame([dict(r) for r in rows])
+
+
+# -------------------------
+# Universal async wrapper
+# -------------------------
+def run_async(coro):
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    else:
+        return loop.run_until_complete(coro)
 
 
 def get_incidents():
@@ -33,7 +40,7 @@ def get_incidents():
         WHERE chat_history.latitude IS NOT NULL
         ORDER BY emergency_reports.timestamp DESC;
     """
-    return asyncio.run(fetch_data(query))
+    return run_async(fetch_data(query))
 
 
 def add_tooltip(df, mode="team"):
@@ -52,8 +59,6 @@ def add_tooltip(df, mode="team"):
     return df
 
 
-
-
 def get_teams():
     query = """
         SELECT 
@@ -66,7 +71,7 @@ def get_teams():
             longitude AS lon
         FROM team_resources;
     """
-    return asyncio.run(fetch_data(query))
+    return run_async(fetch_data(query))
 
 
 def add_team_icons(df):
@@ -84,6 +89,7 @@ def add_incident_icons(df):
     return df
 
 
+# ------------ Load Data ------------
 incidents = add_incident_icons(get_incidents())
 teams = add_team_icons(get_teams())
 teams = add_tooltip(teams, mode="team")

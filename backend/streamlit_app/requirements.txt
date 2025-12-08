@@ -1,0 +1,24 @@
+# path: backend/streamlit_app/requirements.txt
+
+# Core
+streamlit
+pandas
+requests
+asyncpg
+psycopg2-binary
+
+# Mapping
+pydeck
+folium
+streamlit-folium
+
+# Websocket communication
+websockets
+websocket-client
+
+# Utility
+sqlalchemy
+redis
+
+# Optional but recommended for stability
+python-dotenv

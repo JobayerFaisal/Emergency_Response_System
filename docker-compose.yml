@@ -18,7 +18,9 @@ services:
       - "6379:6379"
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: disaster_backend
     depends_on:
       - db
@@ -32,19 +34,20 @@ services:
       - ./backend:/app
 
   streamlit:
-    build: ./backend
+    build:
+      context: ./backend/streamlit_app
+      dockerfile: Dockerfile
     container_name: disaster_streamlit
-    command: streamlit run streamlit_app/pages/9_Resource_Map.py --server.address 0.0.0.0 --server.port 8501
+    depends_on:
+      - backend
+      - db
     ports:
       - "8501:8501"
-    volumes:
-      - ./backend:/app
     environment:
       ENV_DB_URL: postgresql://postgres:postgres@db:5432/disaster_db
-    depends_on:
-      - db
-      - redis
-      - backend
+    volumes:
+      - ./backend/streamlit_app:/app
+
 
 volumes:
   pgdata:
