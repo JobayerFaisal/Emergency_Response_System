@@ -4,7 +4,7 @@ import pandas as pd
 
 st.title("📦 Extracted Emergency Incidents")
 
-API_URL = "http://localhost:8000/api/v1/emergency-reports/"
+API_URL = "http://disaster_backend:8000/api/v1/emergency-reports/"
 
 st.info("Fetching structured emergency reports extracted from responder conversations...")
 

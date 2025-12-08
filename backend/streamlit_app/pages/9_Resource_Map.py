@@ -50,7 +50,7 @@ view_state = pdk.ViewState(
 )
 
 # TEAM LAYER
-ICON_URL = "http://localhost:8501/icons/"  # Streamlit static files (we'll map this next)
+ICON_URL = "http://disaster_streamlit:8501/icons/"  # Streamlit static files (we'll map this next)
 
 # TEAM ICONS
 team_layer = pdk.Layer(

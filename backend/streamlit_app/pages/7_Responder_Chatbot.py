@@ -96,7 +96,10 @@ if "messages" not in st.session_state:
 # -------------------------------
 # WebSocket Endpoint
 # -------------------------------
-WEBSOCKET_URL = f"ws://localhost:8000/api/v1/chat/{responder_id}"
+# -------------------------------
+# WebSocket Endpoint
+# -------------------------------
+WEBSOCKET_URL = f"ws://disaster_backend:8000/api/v1/chat/{responder_id}"
 
 
 # -------------------------------
