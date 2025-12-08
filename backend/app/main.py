@@ -1,16 +1,9 @@
-# backend/app/main.py
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
 import logging
 import json
-
-
-
-
-
 
 # Routers
 from app.api.v1.raw_incidents import router as raw_incidents_router
@@ -24,6 +17,12 @@ from app.api.v1 import emergency_reports as emergency_reports_router
 from app.agents.ingestion.ingestion_agent import IngestionAgent
 from app.agents.dispatch import RescueDispatchAgent
 
+# NEW — Environmental Agent
+from app.agents.agent_1_environmental.main import (
+    AgentConfig,
+    EnvironmentalIntelligenceAgent,
+)
+
 # DB
 from app.core.db import Base, engine
 
@@ -35,7 +34,7 @@ from app.core.db import Base, engine
 async def lifespan(app: FastAPI):
 
     # ---------------------------------------------------------------
-    # Create DB tables (ONLY once here)
+    # Initialize DB
     # ---------------------------------------------------------------
     try:
         print("🌱 [DB] Initializing database tables...")
@@ -45,7 +44,7 @@ async def lifespan(app: FastAPI):
         print("❌ [DB] Failed to initialize tables:", e)
 
     # ---------------------------------------------------------------
-    # Start background agents
+    # Start existing agents (ingestion + dispatch)
     # ---------------------------------------------------------------
     ingestion_agent = IngestionAgent()
     dispatch_agent = RescueDispatchAgent()
@@ -59,16 +58,54 @@ async def lifespan(app: FastAPI):
     app.state.ingestion_agent = ingestion_agent
     app.state.dispatch_agent = dispatch_agent
 
+    # ---------------------------------------------------------------
+    # NEW — Start ENVIRONMENTAL AGENT
+    # ---------------------------------------------------------------
+    logging.info("[main] Starting Environmental Intelligence Agent...")
+
+    env_config = AgentConfig()
+    environmental_agent = EnvironmentalIntelligenceAgent(env_config)
+
+    # Initialize agent (DB, Redis, collectors, processors, zones...)
+    await environmental_agent.startup()
+
+    # Start background monitoring loop
+    environmental_task = asyncio.create_task(environmental_agent.start_monitoring())
+
+    # Save in app state (so API routes can access it)
+    app.state.environmental_agent = environmental_agent
+    app.state.environmental_task = environmental_task
+
+    logging.info("🌤️ Environmental Agent is running in background.")
+
+    # ---------------------------------------------------------------
+    # Yield to FastAPI runtime
+    # ---------------------------------------------------------------
     yield
 
     # ---------------------------------------------------------------
-    # Cleanup on shutdown
+    # Shutdown logic
     # ---------------------------------------------------------------
     logging.info("[main] Stopping ingestion agent...")
     ingestion_agent.stop()
 
     logging.info("[main] Stopping dispatch agent...")
     dispatch_agent.stop()
+
+    # --- Stop Environmental Agent ---
+    logging.info("[main] Stopping Environmental Intelligence Agent...")
+    environmental_agent.running = False
+
+    if app.state.environmental_task:
+        app.state.environmental_task.cancel()
+        try:
+            await app.state.environmental_task
+        except:
+            pass
+
+    await environmental_agent.shutdown()
+
+    logging.info("✅ All background agents stopped.")
 
 
 # -------------------------------------------------------------------

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 import asyncpg
 import os
 import json
+import asyncio
 from datetime import datetime
 
 router = APIRouter()
@@ -50,12 +51,15 @@ async def trigger_monitoring_cycle(request: Request):
     if agent is None:
         raise HTTPException(status_code=503, detail="Environmental Agent not initialized")
 
-    # Run asynchronously
-    import asyncio
-    asyncio.create_task(agent.run_monitoring_cycle())
+    async def run_cycle_and_update():
+        try:
+            await agent.run_monitoring_cycle()
+        except Exception as e:
+            print("Monitoring cycle failed:", e)
 
-    return {"message": "Monitoring cycle started"}
+    asyncio.create_task(run_cycle_and_update())
 
+    return {"message": "Monitoring cycle started", "status": "running"}
 
 # ----------------------------------------------------------------------
 # 4️⃣  HISTORICAL DB PREDICTIONS (your original route, kept)
@@ -104,11 +108,13 @@ async def get_environmental_predictions(limit: int = 20):
             r = dict(row)
 
             # Parse JSON fields
-            if isinstance(r.get("risk_factors"), str):
+            rf = r.get("risk_factors")
+            if isinstance(rf, (str, bytes)):
                 try:
-                    r["risk_factors"] = json.loads(r["risk_factors"])
-                except json.JSONDecodeError:
-                    pass
+                    r["risk_factors"] = json.loads(rf)
+                except:
+                    r["risk_factors"] = {}
+
 
             if isinstance(r.get("recommended_actions"), str):
                 try:
