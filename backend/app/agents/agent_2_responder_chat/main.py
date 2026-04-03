@@ -1,7 +1,6 @@
-# backend/app/agents/agent_2_responder_chat/main.py
-
 import sys
 import os
+import json
 
 # Compute correct project root: D:/Emergency_Response_System/backend
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
@@ -21,19 +20,32 @@ def main():
 
     responder_id = "test-user"
 
-    print("🚨 Minimal Chat System Test")
-    print("---------------------------")
+    print("🚨 Agent-2 Operational Chat Test")
+    print("================================")
 
-    user_msg = "Two injured people are trapped and water is rising fast."
+    # UPDATED TEST MESSAGE FOR AGENT-2 OPERATIONAL EXTRACTION
+    user_msg = (
+        "We rescued 3 people but 2 are still trapped. "
+        "Our boat engine failed and we need diesel and 2 ropes. "
+        "One person is seriously injured and needs urgent treatment. "
+        "Road to Sector 7 is blocked by debris."
+    )
 
     print(f"\nUSER: {user_msg}")
 
+    # Test agent reply
     reply = responder.reply(db, responder_id, user_msg)
-    print(f"\nASSISTANT: {reply}")
+    print(f"\nASSISTANT REPLY:\n{reply}")
 
+    # Test structured extraction
     extracted = extractor.extract(responder_id, user_msg)
-    print("\n📦 Extracted Emergency Data:")
-    print(extracted)
+
+    print("\n📦 Extracted Operational Data:")
+    print("--------------------------------")
+    if extracted:
+        print(json.dumps(extracted.dict(), indent=2))
+    else:
+        print("No extractable information.")
 
     db.close()
 

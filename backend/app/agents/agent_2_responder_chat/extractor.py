@@ -1,5 +1,3 @@
-# backend/app/agents/agent_2_responder_chat/extractor.py
-
 import json
 import re
 from openai import OpenAI
@@ -16,10 +14,13 @@ from openai.types.chat.chat_completion_content_part_text_param import (
 
 client = OpenAI()
 
+
 def normalize_extracted(parsed: dict):
     result = {}
 
-    # people
+    # ------------------------------
+    # People
+    # ------------------------------
     people = parsed.get("people")
     if isinstance(people, int):
         result["people"] = {"count": people}
@@ -28,7 +29,9 @@ def normalize_extracted(parsed: dict):
     else:
         result["people"] = None
 
-    # needs
+    # ------------------------------
+    # Needs
+    # ------------------------------
     needs = parsed.get("needs")
     if isinstance(needs, list):
         result["needs"] = {"items": needs}
@@ -37,14 +40,20 @@ def normalize_extracted(parsed: dict):
     else:
         result["needs"] = None
 
-    # hazards
+    # ------------------------------
+    # Hazards
+    # ------------------------------
     hazards = parsed.get("hazards")
     result["hazards"] = hazards if isinstance(hazards, list) else []
 
-    # urgency
+    # ------------------------------
+    # Urgency
+    # ------------------------------
     result["urgency"] = parsed.get("urgency")
 
-    # confidence → numeric
+    # ------------------------------
+    # Confidence
+    # ------------------------------
     conf = parsed.get("confidence")
     if isinstance(conf, (int, float)):
         result["confidence"] = float(conf)
@@ -54,20 +63,55 @@ def normalize_extracted(parsed: dict):
     else:
         result["confidence"] = None
 
+    # ------------------------------
+    # NEW FIELDS FOR AGENT-2
+    # ------------------------------
+
+    # team_status
+    result["team_status"] = parsed.get("team_status")
+
+    # supply_request
+    sr = parsed.get("supply_request")
+    result["supply_request"] = sr if isinstance(sr, list) else None
+
+    # mobility_issues
+    mi = parsed.get("mobility_issues")
+    result["mobility_issues"] = mi if isinstance(mi, list) else None
+
+    # rescue_progress
+    result["rescue_progress"] = parsed.get("rescue_progress")
+
+    # medical_needs
+    mn = parsed.get("medical_needs")
+    result["medical_needs"] = mn if isinstance(mn, list) else None
+
     return result
 
 
+# -------------------------------------------------------
+# UPDATED SYSTEM PROMPT FOR TEAM OPERATIONS EXTRACTION
+# -------------------------------------------------------
 EXTRACTOR_SYSTEM_PROMPT = """
-Extract ONLY actionable emergency information from a responder message.
+Extract ONLY actionable emergency and operational information.
 Output STRICT JSON with exactly these fields:
+
+Required emergency fields:
 - people
 - needs
 - hazards
 - urgency
 - confidence
 
+Additional fields for rescue-team operations:
+- team_status        (string or null)
+- supply_request     (list or null)
+- mobility_issues    (list or null)
+- rescue_progress    (string or null)
+- medical_needs      (list or null)
+
 If no information is extractable, return {}.
 """
+
 
 class ExtractorAgent:
 
@@ -106,9 +150,11 @@ class ExtractorAgent:
         if not raw:
             return None
 
+        # Try parsing strict JSON
         try:
             parsed = json.loads(raw)
         except:
+            # Attempt to salvage JSON from response
             match = re.search(r"\{.*\}", raw, re.DOTALL)
             if not match:
                 return None

@@ -1,23 +1,22 @@
-# path: backend/app/agents/agent_1_environmental/data_collectors.py
-
 """
 Data Collectors for Environmental Intelligence Agent (Weather-Only)
 ===================================================================
 Asynchronous data collection from OpenWeatherMap API.
 
 Author: Environmental Intelligence Team
-Version: 2.0.0 (Weather Only)
+Version: 2.0.3 (Weather Only, UUID safe + no circular reference)
 """
 
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, cast
+from typing import Dict, List, Optional, Any
 
 import aiohttp
-from aiohttp import ClientSession, ClientTimeout, ClientError
+from aiohttp import ClientSession, ClientTimeout
 from redis import asyncio as aioredis
-
+import json
+from uuid import UUID
 
 from app.agents.agent_1_environmental.models import (
     WeatherData, WeatherMetrics, PrecipitationData, WeatherCondition,
@@ -28,13 +27,29 @@ logger = logging.getLogger(__name__)
 
 
 # =====================================================================
-# WEATHER API COLLECTOR (UNCHANGED)
+# JSON HELPERS
+# =====================================================================
+
+def encode_json(obj):
+    """UUID → str support for Redis."""
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    return obj
+
+
+# =====================================================================
+# WEATHER API COLLECTOR
 # =====================================================================
 
 class WeatherAPICollector:
     """
     Collects weather data from OpenWeatherMap API.
-    Implements caching, rate limiting, and error recovery.
+    Handles:
+        - Safe caching
+        - Rate limiting
+        - Retry + fallback
     """
 
     def __init__(
@@ -49,46 +64,85 @@ class WeatherAPICollector:
         self.cache_ttl = cache_ttl
         self.timeout = ClientTimeout(total=30)
 
-        # Rate limiting
+        # Local rate limit tracking
         self.max_calls_per_minute = 60
         self.call_timestamps: List[datetime] = []
 
         logger.info("WeatherAPICollector initialized")
 
+    # =====================================================================
+    # Rate Limiting
+    # =====================================================================
+
     async def _check_rate_limit(self):
         now = datetime.utcnow()
         self.call_timestamps = [
             ts for ts in self.call_timestamps
-            if now - ts < timedelta(minutes=1)
+            if (now - ts).total_seconds() < 60
         ]
 
         if len(self.call_timestamps) >= self.max_calls_per_minute:
             wait = 60 - (now - self.call_timestamps[0]).total_seconds()
-            logger.warning(f"Rate limit reached — waiting {wait:.1f}s")
+            logger.warning(f"API rate limit hit — waiting {wait:.1f}s")
             await asyncio.sleep(wait)
 
         self.call_timestamps.append(now)
+
+    # =====================================================================
+    # Cache GET
+    # =====================================================================
 
     async def _get_from_cache(self, key: str) -> Optional[Dict[str, Any]]:
         if not self.cache_client:
             return None
         try:
-            cached = await self.cache_client.get(key)
-            if cached:
-                import json
-                return json.loads(cached)
+            data = await self.cache_client.get(key)
+            if data:
+                try:
+                    return json.loads(data)
+                except Exception:
+                    logger.error(f"[Redis] Corrupted JSON: {data}")
+                    return None
         except Exception as e:
-            logger.error(f"Redis error: {e}")
+            logger.error(f"[Redis] Get error: {e}")
         return None
 
-    async def _set_cache(self, key: str, data: Any):
+    # =====================================================================
+    # Cache SET (NO circular references)
+    # =====================================================================
+
+    async def _set_cache(self, key: str, weather: WeatherData):
+        """
+        Store only the *safe* parts of WeatherData.
+        Do NOT store raw_data into cache — it creates circular references.
+        """
         if not self.cache_client:
             return
+
         try:
-            import json
-            await self.cache_client.setex(key, self.cache_ttl, json.dumps(data))
+            cache_payload = {
+                "id": str(weather.id),
+                "timestamp": weather.timestamp.isoformat(),
+                "location": weather.location.model_dump(),
+                "condition": weather.condition.value,
+                "metrics": weather.metrics.model_dump(),
+                "precipitation": weather.precipitation.model_dump(),
+                "description": weather.description,
+                "source": weather.source.value,
+            }
+
+            await self.cache_client.setex(
+                key,
+                self.cache_ttl,
+                json.dumps(cache_payload, default=encode_json)
+            )
+
         except Exception as e:
-            logger.error(f"Redis cache error: {e}")
+            logger.error(f"[Redis] Cache error: {e}")
+
+    # =====================================================================
+    # Weather Condition Mapping
+    # =====================================================================
 
     def _map_condition(self, weather_id: int, main: str) -> WeatherCondition:
         if 200 <= weather_id < 300:
@@ -107,6 +161,10 @@ class WeatherAPICollector:
             return WeatherCondition.CLEAR
         return WeatherCondition.CLOUDS
 
+    # =====================================================================
+    # Fetch Current Weather
+    # =====================================================================
+
     async def fetch_current_weather(
         self,
         location: GeoPoint,
@@ -115,12 +173,14 @@ class WeatherAPICollector:
 
         cache_key = f"weather:{location.latitude}:{location.longitude}"
         cached = await self._get_from_cache(cache_key)
+
         if cached:
             try:
                 return WeatherData(**cached)
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to reconstruct cached WeatherData: {e}")
 
+        # Make API call with rate limit control
         await self._check_rate_limit()
 
         params = {
@@ -133,19 +193,26 @@ class WeatherAPICollector:
         try:
             async with ClientSession(timeout=self.timeout) as s:
                 async with s.get(f"{self.base_url}/weather", params=params) as r:
+
                     if r.status != 200:
-                        logger.error(f"Weather error: HTTP {r.status}")
+                        logger.error(f"Weather API error: HTTP {r.status}")
                         return None
 
                     data = await r.json()
                     weather = self._parse_weather_response(data, location)
 
-                    await self._set_cache(cache_key, weather.model_dump())
+                    # Cache FIXED (safe minimal payload)
+                    await self._set_cache(cache_key, weather)
+
                     return weather
 
         except Exception as e:
-            logger.error(f"Weather fetch error: {e}")
+            logger.error(f"Weather API fetch error: {e}")
             return None
+
+    # =====================================================================
+    # Parse OpenWeather API JSON → WeatherData
+    # =====================================================================
 
     def _parse_weather_response(self, data: Dict[str, Any], location: GeoPoint) -> WeatherData:
 
@@ -182,36 +249,32 @@ class WeatherAPICollector:
 
         return WeatherData(
             location=location,
-            timestamp=datetime.utcfromtimestamp(data.get("dt", datetime.utcnow().timestamp())),
+            timestamp=datetime.utcfromtimestamp(
+                data.get("dt", datetime.utcnow().timestamp())
+            ),
             condition=condition,
             metrics=metrics,
             precipitation=precipitation,
             description=weather_raw.get("description", "Unknown"),
             source=DataSource.OPENWEATHERMAP,
-            raw_data=data,
+            raw_data=data    # Stored in DB, NOT cached
         )
 
+    # =====================================================================
+    # Optional Forecast
+    # =====================================================================
+
     async def fetch_forecast(self, location: GeoPoint, hours: int = 48) -> List[WeatherData]:
-        """Optional forecast support — still weather only."""
+        """Forecast disabled for weather-only mode."""
         return []
 
 
 # =====================================================================
-# WEATHER-ONLY COLLECTOR ORCHESTRATOR
+# ORCHESTRATOR (Weather-only)
 # =====================================================================
 
 class DataCollectionOrchestrator:
-    """
-    Weather-only orchestrator.
-    Removed:
-        - social media collection
-        - satellite
-    """
-
-    def __init__(
-        self,
-        weather_collector: WeatherAPICollector,
-    ):
+    def __init__(self, weather_collector: WeatherAPICollector):
         self.weather_collector = weather_collector
 
         self.polling_intervals = {
@@ -228,20 +291,17 @@ class DataCollectionOrchestrator:
         return self.polling_intervals.get(zone.risk_level.value, 300)
 
     async def collect_zone_data(self, zone: SentinelZone) -> Dict[str, Any]:
-        """Collect weather for a zone (forecast optional)."""
-
         weather = await self.weather_collector.fetch_current_weather(zone.center)
 
         return {
             "zone": zone,
             "weather": weather,
             "forecast": [],
-            "social_posts": [],     # ALWAYS EMPTY (removed)
+            "social_posts": [],
             "collected_at": datetime.utcnow(),
         }
 
     async def collect_all_zones(self, zones: List[SentinelZone]) -> List[Dict[str, Any]]:
-
         tasks = [self.collect_zone_data(z) for z in zones]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

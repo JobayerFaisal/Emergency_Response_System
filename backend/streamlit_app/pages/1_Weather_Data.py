@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+
 from db import get_weather_full
+# from db import get_weather_full
 
 st.set_page_config(page_title="Weather Monitoring Dashboard", layout="wide")
 st.title("🌤️ Environmental Weather Data Overview")

@@ -1,13 +1,3 @@
-# fastapi
-# uvicorn[standard]
-
-datetime
-typing
-logging
-json
-uuid
-enum
-
 
 
 
@@ -17,17 +7,20 @@ alembic
 geoalchemy2
 
 
-openai
 
 websockets
-httpx
 
-tweepy
+
 
 streamlit 
 streamlit-leaflet 
 
 geopy
+
+# API Clients
+openai==1.3.7
+tweepy==4.14.0
+ 
 
 
 # ML-Enhanced Satellite Flood Detection System
@@ -54,10 +47,10 @@ numpy>=1.24.0
 scipy>=1.11.0
 
 # Gradient Boosting (Optional but Recommended)
-xgboost>=2.0.2
+# xgboost>=2.0.2
 
 # Deep Learning (for LSTM and Neural Networks)
-tensorflow>=2.14.0
+# tensorflow>=2.14.0
 # OR use PyTorch (alternative):
 # torch>=2.1.0
 # torchvision>=0.16.0
@@ -88,6 +81,7 @@ psycopg2-binary>=2.9.9  # PostgreSQL
 asyncpg>=0.29.0  # Async PostgreSQL
 redis>=5.0.1  # Redis cache
 sqlalchemy>=2.0.23  # ORM
+asyncio==3.4.3
 
 # ============================================================================
 # WEB FRAMEWORK (if using FastAPI)
@@ -108,6 +102,7 @@ python-dotenv>=1.0.0
 pillow>=10.1.0
 tqdm>=4.66.1  # Progress bars
 joblib>=1.3.2  # Model persistence
+python-dateutil==2.8.2
 
 # ============================================================================
 # TESTING & DEVELOPMENT
@@ -119,6 +114,24 @@ pytest-cov>=4.1.0
 black>=23.11.0  # Code formatting
 flake8>=6.1.0  # Linting
 mypy>=1.7.1  # Type checking
+httpx==0.25.2
+
+
+# Logging & Monitoring
+python-json-logger==2.0.7
+
+tensorflow>=2.10.0
+earthengine-api>=0.1.370
+python-dotenv>=0.19.0
+Pillow>=9.0.0
+
+
+
+
+# Utilities (optional, for extended features)
+python-dotenv>=1.0.0
+
+
 
 # ============================================================================
 # JUPYTER (Optional - for experiments)

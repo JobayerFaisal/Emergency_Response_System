@@ -1,0 +1,22 @@
+<script>
+    function sendLocation() {
+        if (!navigator.geolocation) {
+            Streamlit.setComponentValue({error: "Geolocation not supported"});
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                Streamlit.setComponentValue({
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                });
+            },
+            (err) => {
+                Streamlit.setComponentValue({error: err.message});
+            }
+        );
+    }
+
+    sendLocation();
+</script>

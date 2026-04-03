@@ -1,91 +1,127 @@
-# backend/streamlit_app/pages/7_Responder_Chat.py
-
 import streamlit as st
 import asyncio
 import websockets
 import json
-import streamlit as st
 import streamlit.components.v1 as components
-import json
 import uuid
 
-# -------------------------------
+# ---------------------------------------------------------
+# REAL Geolocation Component (Fully working)
+# ---------------------------------------------------------
 def get_geolocation():
-    geo_id = str(uuid.uuid4()).replace("-", "")
 
-    html_code = f"""
+    # Unique key for Streamlit session
+    key = f"geo_{uuid.uuid4().hex}"
+
+    # JS code: runs in browser → sends data to Streamlit via postMessage
+    geoloc_html = f"""
     <script>
-    const sendLocation = () => {{
-        const elem = window.parent.document.getElementById("{geo_id}");
-        if (navigator.geolocation) {{
+        const sendLocation = () => {{
+            if (!navigator.geolocation) {{
+                window.parent.postMessage({{"type": "geo", "key": "{key}", "error": "Geolocation not supported"}}, "*");
+                return;
+            }}
+
             navigator.geolocation.getCurrentPosition(
                 (pos) => {{
                     const data = {{
                         lat: pos.coords.latitude,
                         lng: pos.coords.longitude
                     }};
-                    elem.value = JSON.stringify(data);
-                    elem.dispatchEvent(new Event("change", {{ bubbles: true }}));
+                    window.parent.postMessage({{"type": "geo", "key": "{key}", "data": data}}, "*");
                 }},
                 (err) => {{
-                    elem.value = JSON.stringify({{"error": err.message}});
-                    elem.dispatchEvent(new Event("change", {{ bubbles: true }}));
+                    window.parent.postMessage({{"type": "geo", "key": "{key}", "error": err.message}}, "*");
                 }}
             );
-        }} else {{
-            elem.value = JSON.stringify({{"error": "Geolocation not supported"}});
-            elem.dispatchEvent(new Event("change", {{ bubbles: true }}));
-        }}
-    }};
-    sendLocation();
-    </script>
+        }};
 
-    <input type="hidden" id="{geo_id}" />
+        sendLocation();
+    </script>
     """
 
-    # Inject JS
-    components.html(html_code, height=0)
+    # Inject JS into Streamlit page
+    components.html(geoloc_html, height=0)
 
-    # Read the value after JS writes it back
-    if geo_id in st.session_state:
-        try:
-            return json.loads(st.session_state[geo_id])
-        except:
-            return None
-    else:
-        # Prepare a listener for when HTML sets the value
-        st.session_state[geo_id] = "{}"
-        return None
+    # Check if JS has already sent back the data
+    return st.session_state.get(key, None)
 
 
+# ---------------------------------------------------------
+# Capture JS → Streamlit incoming messages
+# ---------------------------------------------------------
+# This MUST be placed before get_geolocation() usage
+if "geo_listener" not in st.session_state:
+
+    st.session_state.geo_listener = True
+
+    geolistener_js = """
+    <script>
+        window.addEventListener("message", (event) => {
+            if (event.data && event.data.type === "geo") {
+                // send data into Streamlit state
+                window.parent.postMessage(
+                    { type: "streamlit:setComponentValue", key: event.data.key, value: event.data },
+                    "*"
+                );
+            }
+        });
+    </script>
+    """
+
+    # This loads the listener only once
+    components.html(geolistener_js, height=0)
 
 
 
+# ---------------------------------------------------------
+# Helper: process Streamlit setComponentValue messages
+# ---------------------------------------------------------
+def handle_geo_updates():
+    for k in list(st.session_state.keys()):
+        if isinstance(k, str) and k.startswith("geo_") and isinstance(st.session_state[k], dict):
+            data = st.session_state[k]
+
+            # If JS returned data correctly
+            if "data" in data:
+                return data["data"]
+
+            # If JS returned an error
+            if "error" in data:
+                return {"error": data["error"]}
+
+    return None
 
 
 
-
-
-
+# =========================================================
+#  PAGE UI
+# =========================================================
 
 st.title("🚨 Responder Chat Assistant")
 
+
 # -------------------------------
-# Responder ID (Static or Dynamic)
+# Responder ID
 # -------------------------------
 responder_id = st.text_input("Responder ID", "resp-001")
 
+
 # -------------------------------
-# Load GPS Location
+# GPS Location
 # -------------------------------
 st.subheader("📍 Your Current Location")
 
-location = get_geolocation()   # This triggers the browser's GPS permission popup
+raw_location = get_geolocation()
+location = handle_geo_updates()
 
-if location:
-    st.success(f"Location detected: {location['lat']}, {location['lng']}")
+if location is None:
+    st.info("Detecting GPS location… Please allow browser permission.")
+elif "error" in location:
+    st.error(f"Location Error: {location['error']}")
 else:
-    st.warning("Location not detected yet. Please allow browser permission.")
+    st.success(f"Location detected: {location['lat']}, {location['lng']}")
+
 
 # -------------------------------
 # Chat Message Storage
@@ -93,9 +129,7 @@ else:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# -------------------------------
-# WebSocket Endpoint
-# -------------------------------
+
 # -------------------------------
 # WebSocket Endpoint
 # -------------------------------
@@ -103,7 +137,7 @@ WEBSOCKET_URL = f"ws://disaster_backend:8000/api/v1/chat/{responder_id}"
 
 
 # -------------------------------
-# WebSocket Message Sender
+# Send message via WebSocket
 # -------------------------------
 async def send_message(payload: dict):
     try:
@@ -116,32 +150,27 @@ async def send_message(payload: dict):
 
 
 # -------------------------------
-# Chat Input Section
+# Chat input
 # -------------------------------
 user_msg = st.chat_input("Type your message")
 
 if user_msg:
-    # Save user message
     st.session_state.messages.append(("user", user_msg))
 
-    # Prepare payload for backend
     payload = {
         "message": user_msg,
-        "location": location,  # {"lat": .., "lng": ..}
+        "location": location,  # {lat, lng}
         "responder_id": responder_id,
     }
 
-    # Send message & get reply
     reply = asyncio.run(send_message(payload))
-
-    # Save assistant reply
     st.session_state.messages.append(("assistant", reply))
 
     st.rerun()
 
 
 # -------------------------------
-# Display Chat History
+# Display chat history
 # -------------------------------
 for role, msg in st.session_state.messages:
     st.chat_message(role).write(msg)
