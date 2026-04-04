@@ -1,0 +1,101 @@
+tweet_id,is_flood_related,confidence,flood_severity,location_mentioned,zone_detected,flood_type,urgency_level,needs_rescue,original_text
+7404468956360083034,True,0.9,severe,Pallabi,mirpur,drainage_failure,high,False,Dangerous situation in Pallabi. Drainage system failed completely. Water rose 4 feet in 30 minutes!
+7404468956360083720,True,0.8,moderate,Adabor,mohammadpur,unknown,medium,False,Adabor area flood situation worsening. Local market underwater. Shop owners moving goods.
+7404468956360081975,True,0.95,critical,Mirpur-2,mirpur,unknown,critical,True,HELP! Family trapped in Mirpur-2. Water entering 2nd floor. 4 people including baby. Call 01712XXXXXX
+7404468956360082831,False,0.1,none,,dhanmondi,none,low,False,Dhanmondi lake er pashe ektu pani jomche. Not too bad though.
+7404468956360085083,False,0.1,none,,,none,low,False,Eid shopping at New Market. So crowded!
+7404468956360085063,True,0.85,severe,Badda,badda,unknown,high,True,Badda area is completely underwater. My house ground floor is flooded. Need rescue for my family NOW!
+7404468956360085308,False,0.1,none,,,none,low,False,Eid shopping at New Market. So crowded!
+7404468956360085183,True,0.7,moderate,কাজীপাড়া,mirpur,unknown,medium,False,কাজীপাড়ায় দ্রুত পানি জমছে। স্কুল তাড়াতাড়ি ছুটি দিয়েছে।
+7404468956360082208,True,0.8,moderate,Gulshan,badda,unknown,medium,False,Gulshan area experiencing flooding after 2 hours of rain. Underground parking filling with water.
+7404468956360081946,False,0.2,none,Badda,badda,waterlogging,low,False,Small puddles forming in Badda main road. Nothing serious yet but rain continuing.
+7404468956360084340,True,0.9,minor,কাজীপাড়া,mirpur,waterlogging,low,False,কাজীপাড়ায় দ্রুত পানি জমছে। স্কুল তাড়াতাড়ি ছুটি দিয়েছে।
+7404468956360081901,False,0.1,none,Gulshan,badda,none,low,False,Monsoon vibes in Gulshan. Love this weather! #DhakaRain
+7404468956360083706,True,0.9,minor,কাজীপাড়া,mirpur,waterlogging,low,False,কাজীপাড়ায় দ্রুত পানি জমছে। স্কুল তাড়াতাড়ি ছুটি দিয়েছে।
+7404468956360084358,False,0.1,none,Mirpur,mirpur,none,low,False,Stuck in traffic at Mirpur road. As usual! 🚗
+7404468956360083396,True,0.95,critical,Mohammadpur,mohammadpur,flash_flood,critical,True,Mohammadpur e HEAVY flooding! Pani ghor e dhukche! Amra rooftop e trapped. Keu help korun please! 🆘
+7404468956360082548,True,0.8,minor,Uttara sector 3,uttara,waterlogging,low,False,Light waterlogging in Uttara sector 3. Drainage working but slow.
+7404468956360081854,False,0.1,none,Uttara,uttara,none,low,False,Metro rail construction causing road blocks in Uttara.
+7404468956360084343,True,0.7,minor,মোহাম্মদপুর বাস স্ট্যান্ড,mohammadpur,waterlogging,low,False,মোহাম্মদপুর বাস স্ট্যান্ডে সামান্য পানি। বাস চলছে তবে ধীরে।
+7404468956360082352,True,0.8,moderate,গুলশান,badda,waterlogging,medium,False,গুলশানে ২ ঘণ্টা বৃষ্টির পর বন্যা। আন্ডারগ্রাউন্ড পার্কিং পানিতে ভরছে।
+7404468956360085294,False,0.1,none,ঢাকা,,none,low,False,ঢাকায় আজ সুন্দর বৃষ্টি! চা আর পাকোড়ার আবহাওয়া। 🌧️
+7404468956360082175,False,0.9,none,Mirpur,mirpur,none,low,False,Load shedding again in Mirpur. When will it end?
+7404468956360084633,False,0.8,none,,null,none,low,False,Water filter kinte hobe. Tap water is not safe to drink.
+7404468956360083260,False,0.8,none,,null,none,low,False,Water filter kinte hobe. Tap water is not safe to drink.
+7404468956360084339,True,0.95,minor,মিরপুর,mirpur,waterlogging,low,False,মিরপুর স্টেডিয়ামের কাছে সামান্য জলাবদ্ধতা। এক ঘণ্টায় শুকিয়ে যাবে।
+7404468956360084634,True,0.9,moderate,Baridhara,badda,waterlogging,medium,False,Baridhara r puro rasta pani te bhore gache. Amra office theke baire berote parchi na.
+7404468956360084785,False,0.85,none,Dhaka,null,none,low,False,Beautiful rain in Dhaka today! Perfect weather for chai and pakora. ☔
+7404468956360082181,True,0.9,moderate,Baridhara,badda,waterlogging,medium,False,Baridhara r puro rasta pani te bhore gache. Amra office theke baire berote parchi na.
+7404468956360083911,True,0.95,moderate,Shyamoli,mohammadpur,waterlogging,medium,False,Shyamoli main road flooded again. Same problem every monsoon. When will WASA fix drainage?
+7404468956360083782,True,0.98,severe,Mirpur 12,mirpur,waterlogging,high,False,"Mirpur 12 te disaster! Pani 5 feet high. Rickshaw, car shob floating. Sob route blocked!"
+7404468956360083064,True,0.99,critical,Mirpur-10,mirpur,waterlogging,critical,True,URGENT: Water level rising rapidly in Mirpur-10! Already knee-deep. Need help evacuating elderly neighbors. #DhakaFlood
+7404468956360083954,False,0.9,none,Badda,badda,none,low,False,WASA water supply interrupted in Badda. No water since morning.
+7404468956360083869,False,0.7,none,,,none,low,False,ঢাকায় আজ সুন্দর বৃষ্টি! চা আর পাকোড়ার আবহাওয়া। 🌧️
+7404468956360084249,True,0.95,severe,Pallabi,mirpur,drainage_failure,high,False,Dangerous situation in Pallabi. Drainage system failed completely. Water rose 4 feet in 30 minutes!
+7404468956360082617,True,0.9,moderate,Badda,badda,unknown,medium,True,উদ্ধার দরকার! বাড্ডায় ৬ জন আটকা পড়েছি। পানি বাড়ছে। ফোন: 01819XXXXXX
+7404468956360084668,False,0.8,none,"Uttara, Motijheel",uttara,none,low,False,Uttara to Motijheel takes forever. Dhaka traffic is the worst.
+7404468956360081613,True,0.85,moderate,Gulshan,badda,waterlogging,medium,False,Gulshan area experiencing flooding after 2 hours of rain. Underground parking filling with water.
+7404468956360082816,True,0.9,severe,উত্তরা সেক্টর ৭,uttara,unknown,high,False,উত্তরা সেক্টর ৭ এ ভয়াবহ বন্যা। গাড়ি ভাসছে! রাস্তা সম্পূর্ণ বন্ধ।
+7404468956360082273,True,0.8,moderate,কাজীপাড়া,mirpur,waterlogging,medium,False,কাজীপাড়ায় দ্রুত পানি জমছে। স্কুল তাড়াতাড়ি ছুটি দিয়েছে।
+7404468956360085127,False,0.7,none,Badda,badda,none,low,False,Small puddles forming in Badda main road. Nothing serious yet but rain continuing.
+7404468956360082164,True,0.9,moderate,Shyamoli,mohammadpur,unknown,medium,True,Help needed! Hospital patients being moved to upper floors in Shyamoli. Running out of medicine!
+7404468956360082534,False,0.9,none,Mirpur stadium,mirpur,waterlogging,low,False,Some waterlogging near Mirpur stadium after morning rain. Should clear in an hour.
+7404468956360082845,True,0.95,severe,Uttara Sector 7,uttara,river_overflow,high,False,Major flooding in Uttara Sector 7. Cars are floating! Road completely impassable. Stay safe everyone! 🚨
+7404468956360082947,True,0.85,moderate,মিরপুর,mirpur,waterlogging,medium,True,জরুরি! মিরপুরে পানি দ্রুত বাড়ছে! হাঁটু পানি। বয়স্ক প্রতিবেশীদের সরাতে সাহায্য দরকার। #ঢাকাবন্যা
+7404468956360081760,False,0.8,none,মোহাম্মদপুর বাস স্ট্যান্ড,mohammadpur,waterlogging,low,False,মোহাম্মদপুর বাস স্ট্যান্ডে সামান্য পানি। বাস চলছে তবে ধীরে।
+7404468956360083463,False,0.7,none,Gulshan,badda,none,low,False,Monsoon vibes in Gulshan. Love this weather! #DhakaRain
+7404468956360082872,False,0.8,none,মোহাম্মদপুর বাস স্ট্যান্ড,mohammadpur,waterlogging,low,False,মোহাম্মদপুর বাস স্ট্যান্ডে সামান্য পানি। বাস চলছে তবে ধীরে।
+7404468956360084158,False,0.6,none,Pallabi,mirpur,none,low,False,Bangladesh won the cricket match! 🏏 #BCB
+7404468956351693951,True,0.9,critical,Pallabi,mirpur,drainage_failure,critical,False,Dangerous situation in Pallabi. Drainage system failed completely. Water rose 4 feet in 30 minutes!
+7404468956360084656,False,0.7,none,,null,none,low,False,Water filter kinte hobe. Tap water is not safe to drink.
+7404468956360082485,True,0.8,moderate,Gulshan,badda,waterlogging,medium,False,Gulshan area experiencing flooding after 2 hours of rain. Underground parking filling with water.
+7404468956360082526,False,0.9,none,,,none,low,False,Beautiful rain in Dhaka today! Perfect weather for chai and pakora. ☔
+7404468956360082113,True,0.95,critical,Uttara Sector 11,uttara,unknown,critical,True,EMERGENCY: Disabled person trapped in Uttara Sector 11. Wheelchair bound. Needs immediate evacuation!
+7404468956360081498,True,0.85,severe,Mirpur 12,mirpur,river_overflow,high,False,"Mirpur 12 te disaster! Pani 5 feet high. Rickshaw, car shob floating. Sob route blocked!"
+7404468956360083996,False,0.9,none,Uttara,uttara,none,low,False,Metro rail construction causing road blocks in Uttara.
+7404468956360084965,False,0.9,none,Gulshan,badda,none,low,False,Monsoon vibes in Gulshan. Love this weather! #DhakaRain
+7404468956360082415,False,0.8,none,Dhanmondi,dhanmondi,waterlogging,low,False,Dhanmondi lake er pashe ektu pani jomche. Not too bad though.
+7404468956360083704,False,0.8,none,Dhanmondi,dhanmondi,waterlogging,low,False,Dhanmondi lake er pashe ektu pani jomche. Not too bad though.
+7404468956360082213,True,0.9,moderate,বাড্ডা,badda,unknown,medium,True,উদ্ধার দরকার! বাড্ডায় ৬ জন আটকা পড়েছি। পানি বাড়ছে। ফোন: 01819XXXXXX
+7404468956360084290,True,0.85,moderate,Shyamoli,mohammadpur,unknown,medium,False,Help needed! Hospital patients being moved to upper floors in Shyamoli. Running out of medicine!
+7404468956360083338,False,0.8,none,Dhanmondi,dhanmondi,waterlogging,low,False,Dhanmondi lake er pashe ektu pani jomche. Not too bad though.
+7404468956360082725,True,0.9,moderate,Shyamoli,mohammadpur,drainage_failure,medium,False,Shyamoli main road flooded again. Same problem every monsoon. When will WASA fix drainage?
+7404468956360082655,True,0.8,moderate,Gulshan,badda,drainage_failure,medium,False,Gulshan area experiencing flooding after 2 hours of rain. Underground parking filling with water.
+7404468956360083373,True,0.85,minor,Kazipara,mirpur,waterlogging,low,False,Water accumulating fast in Kazipara. Schools closed early. Students sent home.
+7404468956360082457,True,0.8,moderate,Gulshan,badda,drainage_failure,medium,False,Gulshan area experiencing flooding after 2 hours of rain. Underground parking filling with water.
+7404468956360082885,False,0.2,none,Uttara sector 3,uttara,none,low,False,Light waterlogging in Uttara sector 3. Drainage working but slow.
+7404468956360083648,False,0.1,none,Badda main road,badda,none,low,False,Small puddles forming in Badda main road. Nothing serious yet but rain continuing.
+7404468956360081855,True,0.9,severe,Dhanmondi road 27,dhanmondi,waterlogging,high,False,Significant waterlogging in Dhanmondi road 27. Traffic completely stopped. Water above ankles.
+7404468956360082594,True,0.7,severe,উত্তরা সেক্টর ৭,uttara,waterlogging,high,False,উত্তরা সেক্টর ৭ এ ভয়াবহ বন্যা। গাড়ি ভাসছে! রাস্তা সম্পূর্ণ বন্ধ।
+7404468956360083854,True,0.9,moderate,Adabor,mohammadpur,waterlogging,medium,False,Adabor area flood situation worsening. Local market underwater. Shop owners moving goods.
+7404468956360085030,True,0.8,minor,মিরপুর স্টেডিয়াম,mirpur,waterlogging,low,False,মিরপুর স্টেডিয়ামের কাছে সামান্য জলাবদ্ধতা। এক ঘণ্টায় শুকিয়ে যাবে।
+7404468956360082850,True,0.9,moderate,Adabor,mohammadpur,waterlogging,medium,False,Adabor area flood situation worsening. Local market underwater. Shop owners moving goods.
+7404468956360084760,False,0.1,none,,,none,low,False,Traffic jam at Airport road. Flight might be missed!
+7404468956360082865,False,0.1,none,Mirpur road,mirpur,none,low,False,Stuck in traffic at Mirpur road. As usual! 🚗
+7404468956360084330,False,0.2,none,Dhanmondi lake,dhanmondi,none,low,False,Dhanmondi lake er pashe ektu pani jomche. Not too bad though.
+7404468956360085462,True,0.8,severe,Mohammadpur,mohammadpur,flash_flood,high,True,SOS! Elderly couple stuck in Mohammadpur. Cannot evacuate. Ground floor flooded. Need boat!
+7404468956360084335,True,0.7,minor,Mirpur stadium,mirpur,waterlogging,low,False,Some waterlogging near Mirpur stadium after morning rain. Should clear in an hour.
+7404468956360084321,True,0.9,critical,Mirpur-2,mirpur,river_overflow,critical,True,HELP! Family trapped in Mirpur-2. Water entering 2nd floor. 4 people including baby. Call 01712XXXXXX
+7404468956360082568,True,0.8,severe,বাড্ডা,badda,unknown,high,True,উদ্ধার দরকার! বাড্ডায় ৬ জন আটকা পড়েছি। পানি বাড়ছে। ফোন: 01819XXXXXX
+7404468956360084576,False,0.1,none,New Market,,none,low,False,Eid shopping at New Market. So crowded!
+7404468956360083701,True,0.6,minor,Kazipara,mirpur,waterlogging,low,False,Water accumulating fast in Kazipara. Schools closed early. Students sent home.
+7404468956360085349,False,0.9,none,Badda,badda,none,low,False,WASA water supply interrupted in Badda. No water since morning.
+7404468956360082599,True,0.8,minor,Mohammadpur bus stand,mohammadpur,waterlogging,low,False,Minor flooding at Mohammadpur bus stand. Buses still running but slow.
+7404468956360083751,False,0.9,none,New Market,,none,low,False,Eid shopping at New Market. So crowded!
+7404468956360084658,True,0.85,moderate,Adabor area,mohammadpur,waterlogging,medium,False,Adabor area flood situation worsening. Local market underwater. Shop owners moving goods.
+7404468956360082694,False,0.9,none,Uttara to Motijheel,uttara,none,low,False,Uttara to Motijheel takes forever. Dhaka traffic is the worst.
+7404468956360081881,True,0.8,minor,Shyamoli main road,mohammadpur,waterlogging,low,False,Shyamoli main road flooded again. Same problem every monsoon. When will WASA fix drainage?
+7404468956360083655,True,0.95,severe,Badda area,badda,waterlogging,high,True,Badda area is completely underwater. My house ground floor is flooded. Need rescue for my family NOW!
+7404468956360082765,False,0.9,none,কাজীপাড়া,mirpur,none,low,False,কাজীপাড়ায় দ্রুত পানি জমছে। স্কুল তাড়াতাড়ি ছুটি দিয়েছে।
+7404468956360084410,False,0.9,none,Gulshan club,badda,none,low,False,Swimming pool in Gulshan club is so refreshing!
+7404468956360081448,False,0.9,none,New Market,,none,low,False,Eid shopping at New Market. So crowded!
+7404468956360083030,True,0.9,severe,Badda,badda,unknown,high,True,Badda area is completely underwater. My house ground floor is flooded. Need rescue for my family NOW!
+7404468956360085438,True,0.9,severe,Badda,badda,unknown,high,True,Badda area is completely underwater. My house ground floor is flooded. Need rescue for my family NOW!
+7404468956360083521,False,0.1,none,Mirpur stadium,mirpur,waterlogging,low,False,Some waterlogging near Mirpur stadium after morning rain. Should clear in an hour.
+7404468956360082824,False,0.2,none,Badda main road,badda,waterlogging,low,False,Small puddles forming in Badda main road. Nothing serious yet but rain continuing.
+7404468956360084911,False,0.0,none,Dhanmondi,dhanmondi,none,low,False,Office party at Dhanmondi. Great evening with colleagues!
+7404468956360083733,True,0.8,moderate,কাজীপাড়া,mirpur,unknown,medium,False,কাজীপাড়ায় দ্রুত পানি জমছে। স্কুল তাড়াতাড়ি ছুটি দিয়েছে।
+7404468956360084445,True,0.7,moderate,Kazipara,mirpur,unknown,medium,False,Water accumulating fast in Kazipara. Schools closed early. Students sent home.
+7404468956360084933,False,0.0,none,Mohammadpur,mohammadpur,none,low,False,Had amazing biryani at Mohammadpur today. Must try!
+7404468956360083294,False,0.1,none,Badda,badda,none,low,False,WASA water supply interrupted in Badda. No water since morning.
+7404468956360083554,True,0.9,severe,Mirpur-2,mirpur,unknown,high,True,HELP! Family trapped in Mirpur-2. Water entering 2nd floor. 4 people including baby. Call 01712XXXXXX

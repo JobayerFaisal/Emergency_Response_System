@@ -56,7 +56,7 @@ scipy>=1.11.0
 # torchvision>=0.16.0
 
 # ============================================================================
-# DATA PROCESSING
+# DATA PROCESSINGF
 # ============================================================================
 
 pandas>=2.1.3
@@ -219,3 +219,10 @@ python-dotenv>=1.0.0
 #   
 #   - For "permission denied" errors on Linux/Mac:
 #     pip install -r requirements_ml.txt --user
+
+
+
+
+
+#     pip install -r requirements.txt 
+

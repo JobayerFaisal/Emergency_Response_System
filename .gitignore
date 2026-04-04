@@ -9,7 +9,11 @@ __pycache__/
 
 alembic/
 
-
+.npy
+*.npy
+.ipynb_checkpoints
+.json
+*.json
 
 
 
