@@ -9,7 +9,7 @@ Version: 1.0.0
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 import asyncpg
 from asyncpg import Pool, Connection
@@ -25,6 +25,14 @@ from backend.src.agents.agent_1_environmental.models import (
     GeoPoint, BoundingBox, SentinelZone, EnrichedSocialPost,
     WeatherData, SpatialAnalysisResult, SeverityLevel
 )
+
+# ── datetime helper ──────────────────────────────────────────────────
+def _naive(dt: Optional[datetime]) -> Optional[datetime]:
+    """Strip timezone from a datetime so asyncpg accepts it for TIMESTAMP columns.
+    All datetimes in this project are UTC, so stripping tzinfo is safe."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=None)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -67,8 +75,8 @@ class PostGISSpatialAnalyzer:
                     population_density INTEGER,
                     elevation FLOAT,
                     drainage_capacity VARCHAR(50),
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                    last_monitored TIMESTAMP
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_monitored TIMESTAMPTZ
                 );
             """)
             
@@ -77,7 +85,7 @@ class PostGISSpatialAnalyzer:
                 CREATE TABLE IF NOT EXISTS weather_data (
                     id UUID PRIMARY KEY,
                     zone_id UUID REFERENCES sentinel_zones(id),
-                    timestamp TIMESTAMP NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL,
                     location GEOMETRY(Point, 4326) NOT NULL,
                     temperature FLOAT,
                     humidity FLOAT,
@@ -88,7 +96,7 @@ class PostGISSpatialAnalyzer:
                     precipitation_24h FLOAT,
                     condition VARCHAR(50),
                     raw_data JSONB,
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
             """)
             
@@ -98,7 +106,7 @@ class PostGISSpatialAnalyzer:
                     id UUID PRIMARY KEY,
                     platform_id VARCHAR(255) UNIQUE NOT NULL,
                     zone_id UUID REFERENCES sentinel_zones(id),
-                    timestamp TIMESTAMP NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL,
                     content TEXT NOT NULL,
                     author VARCHAR(255),
                     location GEOMETRY(Point, 4326),
@@ -107,7 +115,7 @@ class PostGISSpatialAnalyzer:
                     contains_flood_report BOOLEAN DEFAULT FALSE,
                     enriched BOOLEAN DEFAULT FALSE,
                     raw_data JSONB,
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
             """)
             
@@ -116,7 +124,7 @@ class PostGISSpatialAnalyzer:
                 CREATE TABLE IF NOT EXISTS flood_predictions (
                     id UUID PRIMARY KEY,
                     zone_id UUID REFERENCES sentinel_zones(id),
-                    timestamp TIMESTAMP NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL,
                     risk_score FLOAT NOT NULL,
                     severity_level VARCHAR(50) NOT NULL,
                     confidence FLOAT NOT NULL,
@@ -124,7 +132,7 @@ class PostGISSpatialAnalyzer:
                     affected_area_km2 FLOAT,
                     risk_factors JSONB,
                     recommended_actions JSONB,
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
             """)
             
@@ -189,8 +197,8 @@ class PostGISSpatialAnalyzer:
                 zone.population_density,
                 zone.elevation,
                 zone.drainage_capacity,
-                zone.created_at,
-                zone.last_monitored
+                _naive(zone.created_at),
+                _naive(zone.last_monitored)
             )
     
     async def store_weather_data(
@@ -217,7 +225,7 @@ class PostGISSpatialAnalyzer:
             """,
                 weather.id,
                 zone_id,
-                weather.timestamp,
+                _naive(weather.timestamp),
                 weather.location.to_wkt(),
                 weather.metrics.temperature,
                 weather.metrics.humidity,
@@ -262,7 +270,7 @@ class PostGISSpatialAnalyzer:
                 post.id,
                 post.platform_id,
                 zone_id,
-                post.timestamp,
+                _naive(post.timestamp),
                 post.content,
                 post.author,
                 location_wkt,
@@ -293,7 +301,7 @@ class PostGISSpatialAnalyzer:
             List of flood reports with distance
         """
         async with self.db_pool.acquire() as conn:
-            since_time = datetime.utcnow() - timedelta(hours=since_hours)
+            since_time = _naive(datetime.now(timezone.utc) - timedelta(hours=since_hours))
             
             rows = await conn.fetch("""
                 SELECT 
@@ -348,7 +356,7 @@ class PostGISSpatialAnalyzer:
             Affected area in square kilometers
         """
         async with self.db_pool.acquire() as conn:
-            since_time = datetime.utcnow() - timedelta(hours=since_hours)
+            since_time = _naive(datetime.now(timezone.utc) - timedelta(hours=since_hours))
             
             # Get convex hull of flood report locations
             result = await conn.fetchrow("""
@@ -401,7 +409,7 @@ class PostGISSpatialAnalyzer:
             List of cluster center points
         """
         async with self.db_pool.acquire() as conn:
-            since_time = datetime.utcnow() - timedelta(hours=since_hours)
+            since_time = _naive(datetime.now(timezone.utc) - timedelta(hours=since_hours))
             
             # Use ST_ClusterDBSCAN for spatial clustering
             rows = await conn.fetch("""
@@ -517,7 +525,7 @@ class PostGISSpatialAnalyzer:
         
         return SpatialAnalysisResult(
             zone=zone,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             affected_area_km2=affected_area,
             nearby_reports_count=len(nearby_reports),
             average_severity=avg_severity,
@@ -571,7 +579,7 @@ class PostGISSpatialAnalyzer:
             Historical risk score (0-1)
         """
         async with self.db_pool.acquire() as conn:
-            since_time = datetime.utcnow() - timedelta(days=lookback_days)
+            since_time = _naive(datetime.now(timezone.utc) - timedelta(days=lookback_days))
             
             result = await conn.fetchrow("""
                 SELECT 
@@ -605,7 +613,7 @@ class PostGISSpatialAnalyzer:
             days_to_keep: Number of days of data to retain
         """
         async with self.db_pool.acquire() as conn:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+            cutoff_date = _naive(datetime.now(timezone.utc) - timedelta(days=days_to_keep))
             
             # Delete old weather data
             weather_deleted = await conn.execute("""
@@ -618,7 +626,7 @@ class PostGISSpatialAnalyzer:
             """, cutoff_date)
             
             # Keep predictions longer (90 days)
-            prediction_cutoff = datetime.utcnow() - timedelta(days=90)
+            prediction_cutoff = _naive(datetime.now(timezone.utc) - timedelta(days=90))
             predictions_deleted = await conn.execute("""
                 DELETE FROM flood_predictions WHERE timestamp < $1;
             """, prediction_cutoff)

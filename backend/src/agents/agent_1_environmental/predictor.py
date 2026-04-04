@@ -1,3 +1,7 @@
+# backend/src/agents/agent_1_environmental/predictor.py
+
+
+
 """
 Flood Predictor for Environmental Intelligence Agent
 ====================================================
@@ -23,7 +27,7 @@ Version: 2.0.0
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 import sys
 import os
@@ -119,6 +123,7 @@ class FloodRiskPredictor:
         return normalized_weather.get('rainfall_intensity', 0.0)
     
     def calculate_accumulated_rainfall_factor(
+            
         self,
         normalized_weather: Dict[str, float]
     ) -> float:
@@ -798,7 +803,7 @@ class FloodRiskPredictor:
         weather_age = 0.0
         if weather_data:
             weather_age = (
-                datetime.utcnow() - weather_data.timestamp
+                datetime.now(timezone.utc) - weather_data.timestamp
             ).total_seconds() / 3600
         
         # Extract satellite confidence if available
@@ -873,7 +878,7 @@ class FloodRiskPredictor:
         
         prediction = FloodPrediction(
             zone=zone,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             risk_score=risk_score,
             severity_level=severity,
             confidence=confidence,
@@ -1156,7 +1161,7 @@ class PredictionOrchestrator:
         
         spatial_analysis = SpatialAnalysisResult(
             zone=zone,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             affected_area_km2=estimated_area,
             nearby_reports_count=social_analysis.get('flood_reports', 0),
             average_severity=social_analysis.get('urgency_score', 0.0),

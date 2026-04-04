@@ -1,14 +1,15 @@
 version: '3.8'
 
 services:
-  # PostgreSQL service (for your database)
+
+  # PostgreSQL + PostGIS service
   postgres:
     image: postgis/postgis:15-3.3
     container_name: disaster_postgres
     environment:
       POSTGRES_DB: disaster_response
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres             # matches DATABASE_URL user
+      POSTGRES_PASSWORD: postgres         # matches DATABASE_URL password
     ports:
       - "5432:5432"
     volumes:
@@ -25,31 +26,33 @@ services:
     networks:
       - disaster_network
 
-  # Backend service (where your FastAPI app runs)
+  # Backend service (FastAPI)
   backend:
     build:
-      context: ./backend  # Path to the backend folder
-      dockerfile: Dockerfile  # Dockerfile inside the backend folder
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: disaster_backend
     depends_on:
       - postgres
       - redis
     environment:
-      DATABASE_URL: postgresql://disaster_admin:disaster123@postgres:5432/disaster_response
+      # IMPORTANT: inside Docker containers, use the service name "postgres"
+      # not "localhost" — localhost inside a container points to itself, not the DB.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app  # Mount the backend folder to /app inside the container
+      - ./backend:/app
     env_file:
-      - .env  # Reference the .env file from the root directory
+      - .env
     networks:
       - disaster_network
 
-  # Streamlit app service (for your Streamlit UI)
+  # Streamlit UI service
   streamlit:
     build:
-      context: ./backend/streamlit_app  # Build context for streamlit app
+      context: ./backend/streamlit_app
       dockerfile: Dockerfile
     container_name: disaster_streamlit
     depends_on:
@@ -59,15 +62,16 @@ services:
     volumes:
       - ./backend/streamlit_app:/app
     environment:
-      ENV_DB_URL: postgresql://disaster_admin:disaster123@postgres:5432/disaster_response
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL: redis://redis:6379/0
     networks:
       - disaster_network
 
   # Agent 1 (Environmental Intelligence)
   agent1:
     build:
-      context: ./backend  # Path to the backend folder
-      dockerfile: Dockerfile  # Path to Dockerfile inside the backend folder
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: agent1_environmental
     depends_on:
       - postgres
@@ -78,54 +82,62 @@ services:
     volumes:
       - ./backend:/app
     env_file:
-      - .env  # Ensure that the .env file is loaded from the main directory
+      - .env
     ports:
-      - "8001:8000"
+      - "8001:8001"
     networks:
       - disaster_network
-    command: ["python", "src/agents/agent_1_environmental/main.py"]  # Run main.py instead of FastAPI
+    # Path inside container: /app/src/agents/agent_1_environmental/main.py
+    # (./backend is mounted to /app, and real path is backend/src/agents/...)
+    command: ["python", "src/agents/agent_1_environmental/main.py"]
 
-  # # Agent 3 (Resource Management)
+  # Agent 3 (Resource Management) — uncomment when ready
   # agent3:
   #   build:
-  #     context: ./backend/src/agents/agent_3_resource  # Build context for agent3
-  #     dockerfile: backend/Dockerfile  # Dockerfile inside backend folder
+  #     context: ./backend
+  #     dockerfile: Dockerfile
   #   container_name: agent3_resource
   #   depends_on:
   #     - postgres
   #     - redis
   #   environment:
-  #     DATABASE_URL: postgresql://disaster_admin:disaster123@postgres:5432/disaster_response
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
   #     REDIS_URL: redis://redis:6379/0
   #   ports:
-  #     - "8003:8000"
+  #     - "8003:8003"
   #   volumes:
-  #     - ./backend/src:/app/src
+  #     - ./backend:/app
+  #   env_file:
+  #     - .env
   #   networks:
   #     - disaster_network
+  #   command: ["python", "src/agents/agent_3_resource/main.py"]
 
-  # Agent 4 (Dispatch Optimization)
+  # Agent 4 (Dispatch Optimization) — uncomment when ready
   # agent4:
   #   build:
-  #     context: ./backend/src/agents/agent_4_dispatch  # Build context for agent4
-  #     dockerfile: backend/Dockerfile  # Dockerfile inside backend folder
+  #     context: ./backend
+  #     dockerfile: Dockerfile
   #   container_name: agent4_dispatch
   #   depends_on:
   #     - postgres
   #     - redis
   #   environment:
-  #     DATABASE_URL: postgresql://disaster_admin:disaster123@postgres:5432/disaster_response
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
   #     REDIS_URL: redis://redis:6379/0
   #   ports:
-  #     - "8004:8000"
+  #     - "8004:8004"
   #   volumes:
-  #     - ./backend/src:/app/src
+  #     - ./backend:/app
+  #   env_file:
+  #     - .env
   #   networks:
   #     - disaster_network
+  #   command: ["python", "src/agents/agent_4_dispatch/main.py"]
 
 volumes:
   postgres_data:
-  postgres_data_restore:
+  # removed orphan volume "postgres_data_restore" — was declared but never mounted
 
 networks:
   disaster_network:

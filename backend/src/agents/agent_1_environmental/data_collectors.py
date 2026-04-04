@@ -1,3 +1,5 @@
+# backend/src/agents/agent_1_environmental/data_collectors.py
+
 """
 Data Collectors for Environmental Intelligence Agent
 =====================================================
@@ -10,7 +12,7 @@ Version: 1.0.0
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, cast
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout, ClientError
@@ -72,7 +74,7 @@ class WeatherAPICollector:
     
     async def _check_rate_limit(self) -> None:
         """Enforce rate limiting"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # Remove timestamps older than 1 minute
         self.call_timestamps = [
             ts for ts in self.call_timestamps 
@@ -266,7 +268,7 @@ class WeatherAPICollector:
         
         return WeatherData(
             location=location,
-            timestamp=datetime.utcfromtimestamp(data.get('dt', datetime.utcnow().timestamp())),
+            timestamp=datetime.fromtimestamp(data.get('dt', datetime.now(timezone.utc).timestamp()), tz=timezone.utc),
             condition=condition,
             metrics=metrics,
             precipitation=precipitation,
@@ -476,7 +478,7 @@ class SocialMediaCollector:
                 logger.error(f"Cache retrieval error: {e}")
         
         query = self._build_query(zone)
-        start_time = datetime.utcnow() - timedelta(hours=since_hours)
+        start_time = datetime.now(timezone.utc) - timedelta(hours=since_hours)
         
         try:
             # Use asyncio thread pool for synchronous tweepy call
@@ -522,13 +524,16 @@ class SocialMediaCollector:
             return posts
         
         except tweepy.TooManyRequests:
-            logger.error("Twitter API rate limit exceeded")
+            logger.warning("Twitter API rate limit exceeded — skipping social data")
+            return []
+        except tweepy.Unauthorized:
+            logger.warning("Twitter API credentials invalid or missing — skipping social data")
             return []
         except tweepy.TwitterServerError as e:
-            logger.error(f"Twitter server error: {e}")
+            logger.warning(f"Twitter server error — skipping social data: {e}")
             return []
         except Exception as e:
-            logger.error(f"Error fetching tweets: {e}", exc_info=True)
+            logger.warning(f"Twitter unavailable — skipping social data: {e}")
             return []
     
     def _parse_tweet(
@@ -640,15 +645,15 @@ class DataCollectionOrchestrator:
     def __init__(
         self,
         weather_collector: WeatherAPICollector,
-        social_collector: SocialMediaCollector,
+        social_collector: Optional[SocialMediaCollector],  # FIX: Optional — may be None when token missing
         satellite_collector: Optional[SatelliteDataCollector] = None
     ):
         """
         Initialize orchestrator.
-        
+
         Args:
             weather_collector: Weather API collector instance
-            social_collector: Social media collector instance
+            social_collector: Social media collector instance (None if token not configured)
             satellite_collector: Satellite imagery collector instance (optional)
         """
         self.weather_collector = weather_collector
@@ -696,28 +701,39 @@ class DataCollectionOrchestrator:
         """
         logger.info(f"Collecting data for zone: {zone.name}")
         
-        # Build task list — weather + social always, satellite if available
+        # Build task list — weather always, social only if collector available
         weather_task = self.weather_collector.fetch_current_weather(zone.center)
         forecast_task = self.weather_collector.fetch_forecast(zone.center, hours=24)
-        social_task = self.social_collector.fetch_recent_posts(zone, max_results=100)
-        
-        if self.satellite_collector:
+
+        # FIX 2: social_collector may be None when Twitter token is not configured
+        if self.social_collector is not None and self.satellite_collector is not None:
             satellite_task = self.satellite_collector.fetch_satellite_data(zone, str(zone.id))
-            
             weather, forecast, social_posts, satellite = await asyncio.gather(
-                weather_task,
-                forecast_task,
-                social_task,
+                weather_task, forecast_task,
+                self.social_collector.fetch_recent_posts(zone, max_results=100),
                 satellite_task,
                 return_exceptions=True
             )
-        else:
+        elif self.social_collector is not None:
             weather, forecast, social_posts = await asyncio.gather(
-                weather_task,
-                forecast_task,
-                social_task,
+                weather_task, forecast_task,
+                self.social_collector.fetch_recent_posts(zone, max_results=100),
                 return_exceptions=True
             )
+            satellite = None
+        elif self.satellite_collector is not None:
+            satellite_task = self.satellite_collector.fetch_satellite_data(zone, str(zone.id))
+            weather, forecast, satellite = await asyncio.gather(
+                weather_task, forecast_task, satellite_task,
+                return_exceptions=True
+            )
+            social_posts = []
+        else:
+            weather, forecast = await asyncio.gather(
+                weather_task, forecast_task,
+                return_exceptions=True
+            )
+            social_posts = []
             satellite = None
         
         # Build merged result
@@ -727,7 +743,7 @@ class DataCollectionOrchestrator:
             'forecast': forecast if not isinstance(forecast, Exception) else [],
             'social_posts': social_posts if not isinstance(social_posts, Exception) else [],
             'satellite': satellite if (satellite is not None and not isinstance(satellite, Exception)) else None,
-            'collected_at': datetime.utcnow()
+            'collected_at': datetime.now(timezone.utc)
         }
         
         # Log satellite status for this zone

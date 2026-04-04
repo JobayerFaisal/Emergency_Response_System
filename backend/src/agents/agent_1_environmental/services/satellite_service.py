@@ -16,7 +16,7 @@ import logging
 import os
 import json
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
@@ -64,15 +64,45 @@ class SatelliteData:
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize for JSON/Redis storage"""
+
+        def _make_serializable(obj: Any) -> Any:
+            """FIX: Recursively convert types that json.dumps() cannot handle.
+            - numpy bool_ / bool → Python int (0 or 1)
+            - numpy float32/float64 → Python float
+            - numpy int types → Python int
+            - dict/list are traversed recursively
+            """
+            if isinstance(obj, dict):
+                return {k: _make_serializable(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [_make_serializable(v) for v in obj]
+            # numpy scalar types
+            try:
+                import numpy as np
+                if isinstance(obj, (np.bool_,)):
+                    return int(obj)
+                if isinstance(obj, (np.integer,)):
+                    return int(obj)
+                if isinstance(obj, (np.floating,)):
+                    return float(obj)
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+            except ImportError:
+                pass
+            # Plain Python bool must come AFTER numpy check (bool is subclass of int)
+            if isinstance(obj, bool):
+                return int(obj)
+            return obj
+
         result = {
             "zone_id": self.zone_id,
             "timestamp": self.timestamp.isoformat(),
-            "sar_available": self.sar_available,
+            "sar_available": int(self.sar_available),   # bool → int
             "source": self.source,
             "processing_time_seconds": self.processing_time_seconds,
         }
         if self.flood_detection:
-            result["flood_detection"] = asdict(self.flood_detection)
+            result["flood_detection"] = _make_serializable(asdict(self.flood_detection))
         return result
 
 
@@ -238,7 +268,7 @@ class SatelliteDataCollector:
         cache_ttl: int = 3600,  # 1 hour (satellite data changes slowly)
     ):
         self.gee_project_id = gee_project_id or os.getenv(
-            'GEE_PROJECT_ID', 'caramel-pulsar-475810-e7'
+            'GEE_PROJECT_ID', 'geecap'
         )
         self.model_path = model_path or os.getenv(
             'FLOOD_MODEL_PATH',
@@ -329,11 +359,11 @@ class SatelliteDataCollector:
                 zone_id=zone_id,
                 zone_name=zone_name,
                 bounds=bounds,
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 error="Flood detection model not available",
             )
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         cur_end = now.strftime('%Y-%m-%d')
         cur_start = (now - timedelta(days=30)).strftime('%Y-%m-%d')
 
@@ -343,7 +373,7 @@ class SatelliteDataCollector:
             if ref_raw is None:
                 return FloodDetectionResult(
                     zone_id=zone_id, zone_name=zone_name, bounds=bounds,
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     error="No reference SAR data",
                 )
 
@@ -352,7 +382,7 @@ class SatelliteDataCollector:
             if cur_raw is None:
                 return FloodDetectionResult(
                     zone_id=zone_id, zone_name=zone_name, bounds=bounds,
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     error="No current SAR data",
                 )
 
@@ -362,7 +392,7 @@ class SatelliteDataCollector:
             if ref_proc is None or cur_proc is None:
                 return FloodDetectionResult(
                     zone_id=zone_id, zone_name=zone_name, bounds=bounds,
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     error="SAR preprocessing failed",
                 )
 
@@ -386,7 +416,7 @@ class SatelliteDataCollector:
                 zone_id=zone_id,
                 zone_name=zone_name,
                 bounds=bounds,
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 reference_date=ref_date,
                 current_date=cur_date,
                 flood_detected=analysis['flood_pct'] > 3.0,
@@ -403,7 +433,7 @@ class SatelliteDataCollector:
             logger.error(f"[{zone_name}] Detection failed: {e}", exc_info=True)
             return FloodDetectionResult(
                 zone_id=zone_id, zone_name=zone_name, bounds=bounds,
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 error=str(e),
             )
 
@@ -437,18 +467,18 @@ class SatelliteDataCollector:
                 logger.error(f"Satellite cache error: {e}")
 
         # Run in thread pool
-        start = datetime.utcnow()
+        start = datetime.now(timezone.utc)
         bounds = self._zone_to_bounds(zone)
 
         flood_result = await asyncio.to_thread(
             self._run_flood_detection_sync, zid, zone.name, bounds,
         )
 
-        processing_time = (datetime.utcnow() - start).total_seconds()
+        processing_time = (datetime.now(timezone.utc) - start).total_seconds()
 
         satellite_data = SatelliteData(
             zone_id=zid,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             flood_detection=flood_result,
             sar_available=flood_result.error is None,
             source="sentinel_1_gee",
@@ -479,7 +509,7 @@ class SatelliteDataCollector:
             except Exception as e:
                 logger.error(f"Satellite fetch error for {zone.name}: {e}")
                 results[zid] = SatelliteData(
-                    zone_id=zid, timestamp=datetime.utcnow(), sar_available=False,
+                    zone_id=zid, timestamp=datetime.now(timezone.utc), sar_available=False,
                 )
 
         return results

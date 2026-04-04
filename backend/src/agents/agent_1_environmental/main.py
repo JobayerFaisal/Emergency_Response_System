@@ -1,3 +1,6 @@
+# backend/src/agents/agent_1_environmental/main.py
+
+
 """
 Environmental Intelligence Agent - Main Orchestrator
 ===================================================
@@ -12,7 +15,7 @@ Version: 1.0.0
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, cast
 import signal
 import sys
@@ -54,12 +57,15 @@ from backend.src.agents.agent_1_environmental.predictor import (
 )
 
 # Configure logging
+# FIX 1: Force UTF-8 on the stream handler so emoji characters (✅ etc.)
+# don't crash on Windows consoles that default to cp1252 encoding.
+_utf8_stream = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('agent_1_environmental.log'),
-        logging.StreamHandler(sys.stdout)
+        logging.FileHandler('agent_1_environmental.log', encoding='utf-8'),
+        logging.StreamHandler(_utf8_stream),
     ]
 )
 logger = logging.getLogger(__name__)
@@ -76,61 +82,52 @@ class AgentConfig:
         """Load configuration from environment"""
         import os
         from dotenv import load_dotenv
-        from pathlib import Path
-    
-        # Debug: Show current directory
-        current_dir = os.getcwd()
-        print(f"🔍 DEBUG: Current directory = {current_dir}")
-    
-        # Debug: Check if .env exists
-        env_path = Path('.env')
-        print(f"🔍 DEBUG: .env exists in current dir = {env_path.exists()}")
-    
+
         # Load .env file
-        loaded = load_dotenv()
-        print(f"🔍 DEBUG: load_dotenv() returned = {loaded}")
-    
+        load_dotenv()
+
         # API Keys
         self.openweather_api_key = os.getenv('OPENWEATHER_API_KEY')
+        # FIX 2a: Twitter is optional — agent runs without it
         self.twitter_bearer_token = os.getenv('TWITTER_BEARER_TOKEN')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
-    
+
         # Database
+        # FIX 2b: Correct default to match real DATABASE_URL
         self.database_url = os.getenv(
             'DATABASE_URL',
-            'postgresql://user:password@postgres:5432/disaster_response'
+            'postgresql://postgres:postgres@localhost:5432/disaster_response'
         )
-    
-    # Debug: Show what DATABASE_URL was loaded
-        print(f"🔍 DEBUG: DATABASE_URL = {self.database_url}")
-    
-        # Redis
-        self.redis_url = os.getenv('REDIS_URL', 'redis://redis:6379')
-    
+
+        # FIX 2c: Redis default changed from redis://redis:6379 to localhost
+        self.redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+
         # Agent Settings
         self.agent_id = os.getenv('AGENT_ID', 'agent_1_environmental')
         self.monitoring_interval = int(os.getenv('MONITORING_INTERVAL', '300'))
         self.enable_adaptive_polling = os.getenv('ENABLE_ADAPTIVE_POLLING', 'true').lower() == 'true'
-    
-        # Validate required config
+
+        # Validate only truly required config
         self._validate()
 
         # Tell type checkers these values are non-None after validation
         self.openweather_api_key = cast(str, self.openweather_api_key)
-        self.twitter_bearer_token = cast(str, self.twitter_bearer_token)
         self.openai_api_key = cast(str, self.openai_api_key)
     
     def _validate(self):
-        """Validate required configuration"""
+        """Validate required configuration — Twitter and Redis are optional"""
         required = {
             'OPENWEATHER_API_KEY': self.openweather_api_key,
-            'TWITTER_BEARER_TOKEN': self.twitter_bearer_token,
-            'OPENAI_API_KEY': self.openai_api_key
+            'OPENAI_API_KEY': self.openai_api_key,
         }
-        
+
         missing = [k for k, v in required.items() if not v]
         if missing:
             raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+
+        # FIX 2d: Warn about optional services instead of crashing
+        if not self.twitter_bearer_token:
+            logger.warning("TWITTER_BEARER_TOKEN not set — social media collection disabled")
 
 
 # =====================================================================
@@ -192,12 +189,27 @@ class EnvironmentalIntelligenceAgent:
             )
             logger.info("Database connection pool created")
             
-            # Initialize Redis
-            self.redis_client = await aioredis.from_url(
-                self.config.redis_url,
-                decode_responses=True
-            )
-            logger.info("Redis connection established")
+            # FIX 3: Redis is optional — if it's not running locally we skip caching
+            # gracefully instead of crashing. All cache reads/writes already have
+            # try/except, so None cache_client simply means no caching.
+            try:
+                self.redis_client = await aioredis.from_url(
+                    self.config.redis_url,
+                    decode_responses=True,
+                    socket_connect_timeout=2,
+                )
+                # Ping to verify the connection is actually alive.
+                # FIX: Pyright redis stubs declare ping()->bool (sync stub bug).
+                # We cast to suppress the false "bool is not awaitable" error.
+                # At runtime aioredis.ping() is always a coroutine.
+                import inspect as _inspect
+                _ping = self.redis_client.ping()
+                if _inspect.isawaitable(_ping):
+                    await _ping
+                logger.info("Redis connection established")
+            except Exception as e:
+                logger.warning(f"Redis unavailable ({e}) — running without cache")
+                self.redis_client = None
             
             # Initialize data collectors
             self.weather_collector = WeatherAPICollector(
@@ -205,10 +217,16 @@ class EnvironmentalIntelligenceAgent:
                 cache_client=self.redis_client
             )
             
-            self.social_collector = SocialMediaCollector(
-                bearer_token=cast(str, self.config.twitter_bearer_token),
-                cache_client=self.redis_client
-            )
+            # FIX 4: Only create social collector if a token is configured.
+            # Without a valid bearer token Tweepy raises 401 on every call.
+            if self.config.twitter_bearer_token:
+                self.social_collector = SocialMediaCollector(
+                    bearer_token=self.config.twitter_bearer_token,
+                    cache_client=self.redis_client
+                )
+            else:
+                logger.warning("Social media collector disabled — no Twitter token")
+                self.social_collector = None
             
             # Initialize satellite collector (GEE + CNN flood detection)
             try:
@@ -403,7 +421,7 @@ class EnvironmentalIntelligenceAgent:
         Returns:
             Agent output with predictions and alerts
         """
-        cycle_start = datetime.utcnow()
+        cycle_start = datetime.now(timezone.utc)
         logger.info("=" * 60)
         logger.info("Starting monitoring cycle")
         
@@ -502,7 +520,7 @@ class EnvironmentalIntelligenceAgent:
                     """,
                         prediction.id,
                         prediction.zone.id,
-                        prediction.timestamp,
+                        prediction.timestamp.replace(tzinfo=None),  # Store as naive UTC
                         prediction.risk_score,
                         prediction.severity_level.value,
                         prediction.confidence,
@@ -514,11 +532,11 @@ class EnvironmentalIntelligenceAgent:
             
             # Update zone monitoring timestamps
             for zone in self.sentinel_zones:
-                zone.last_monitored = datetime.utcnow()
+                zone.last_monitored = datetime.now(timezone.utc)
                 await self.spatial_analyzer.store_sentinel_zone(zone)
             
             # Calculate processing time
-            processing_time = (datetime.utcnow() - cycle_start).total_seconds()
+            processing_time = (datetime.now(timezone.utc) - cycle_start).total_seconds()
             
             # Determine next update interval (adaptive polling)
             next_update = self._calculate_next_update_interval(predictions)
@@ -526,7 +544,7 @@ class EnvironmentalIntelligenceAgent:
             # Create agent output
             output = AgentOutput(
                 agent_id=self.config.agent_id,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 predictions=predictions,
                 alerts=alerts,
                 monitored_zones=self.sentinel_zones,
@@ -542,7 +560,7 @@ class EnvironmentalIntelligenceAgent:
             
             # Store as latest output
             self.latest_output = output
-            self.last_update = datetime.utcnow()
+            self.last_update = datetime.now(timezone.utc)
             
             # Log summary
             logger.info(f"✅ Monitoring cycle complete in {processing_time:.2f}s")
@@ -577,7 +595,7 @@ class EnvironmentalIntelligenceAgent:
             SeverityLevel.HIGH: 180,         # 3 minutes
             SeverityLevel.MODERATE: 300,     # 5 minutes
             SeverityLevel.LOW: 900,          # 15 minutes
-            SeverityLevel.MINIMAL: 1800      # 30 minutes
+            SeverityLevel.MINIMAL: 180      # 3 minutes
         }
         
         return intervals.get(max_severity, self.config.monitoring_interval)
@@ -610,21 +628,21 @@ class EnvironmentalIntelligenceAgent:
                 active_zones=len(self.sentinel_zones),
                 total_predictions=0,
                 critical_alerts=0,
-                last_update=datetime.utcnow(),
-                next_update=datetime.utcnow(),
+                last_update=datetime.now(timezone.utc),
+                next_update=datetime.now(timezone.utc),
                 data_freshness_seconds=float('inf')
             )
         
         freshness = (
-            datetime.utcnow() - self.last_update
+            datetime.now(timezone.utc) - self.last_update
         ).total_seconds() if self.last_update else 0
         
         return MonitoringStatus(
             active_zones=len(self.sentinel_zones),
             total_predictions=len(self.latest_output.predictions),
             critical_alerts=len(self.latest_output.critical_alerts),
-            last_update=self.last_update or datetime.utcnow(),
-            next_update=(self.last_update or datetime.utcnow()) + 
+            last_update=self.last_update or datetime.now(timezone.utc),
+            next_update=(self.last_update or datetime.now(timezone.utc)) + 
                        timedelta(seconds=self.latest_output.next_update_in_seconds),
             data_freshness_seconds=freshness
         )
