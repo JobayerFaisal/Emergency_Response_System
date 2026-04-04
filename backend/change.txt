@@ -9,3 +9,6 @@ ALTER TABLE chat_history ADD COLUMN longitude DOUBLE PRECISION;
 
 
 docker-compose up -d
+
+
+
