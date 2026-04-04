@@ -571,7 +571,40 @@ class EnvironmentalIntelligenceAgent:
             # Store as latest output
             self.latest_output = output
             self.last_update = datetime.now(timezone.utc)
-            
+
+            # Step 7: Publish high-risk predictions to Redis → Agent 2
+            if self.redis_client:
+                for prediction in predictions:
+                    if prediction.risk_score >= 0.5:
+                        try:
+                            msg = {
+                                "message_id": str(__import__('uuid').uuid4()),
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "sender_agent": "agent_1_environmental",
+                                "receiver_agent": "agent_2_distress",
+                                "message_type": "flood_alert",
+                                "zone_id": str(prediction.zone.id),
+                                "priority": 5 if prediction.risk_score >= 0.8 else 3,
+                                "payload": {
+                                    "zone_id": str(prediction.zone.id),
+                                    "zone_name": prediction.zone.name,
+                                    "risk_score": prediction.risk_score,
+                                    "severity_level": prediction.severity_level.value,
+                                    "confidence": prediction.confidence,
+                                    "risk_factors": prediction.risk_factors.model_dump() if hasattr(prediction.risk_factors, "model_dump") else prediction.risk_factors,
+                                    "timestamp": prediction.timestamp.isoformat(),
+                                }
+                            }
+                            await self.redis_client.publish("flood_alert", json.dumps(msg))
+                            logger.info(
+                                f"📡 Published flood_alert for {prediction.zone.name} "
+                                f"(risk={prediction.risk_score:.2f}, severity={prediction.severity_level.value})"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to publish flood_alert for {prediction.zone.name}: {e}")
+            else:
+                logger.debug("Redis not available — skipping flood_alert publish")
+
             # Log summary
             logger.info(f"✅ Monitoring cycle complete in {processing_time:.2f}s")
             logger.info(f"   Predictions: {len(predictions)}")
