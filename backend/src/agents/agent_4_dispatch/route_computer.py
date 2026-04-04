@@ -21,7 +21,7 @@ logger = logging.getLogger("agent4.route_computer")
 
 class RouteComputer:
 
-    def __init__(self, osrm_url: str = "http://localhost:5000"):
+    def __init__(self, osrm_url: str = "http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}"):
         self.osrm_url = osrm_url.rstrip("/")
 
     # ─────────────────────────────────────────────────────────────────────

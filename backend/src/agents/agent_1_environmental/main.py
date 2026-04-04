@@ -511,24 +511,34 @@ class EnvironmentalIntelligenceAgent:
                     logger.error("Database pool is not initialized.")
                     continue
                 async with self.db_pool.acquire() as conn:
-                    await conn.execute("""
-                        INSERT INTO flood_predictions (
-                            id, zone_id, timestamp, risk_score, severity_level,
-                            confidence, time_to_impact_hours, affected_area_km2,
-                            risk_factors, recommended_actions
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
-                    """,
-                        prediction.id,
-                        prediction.zone.id,
-                        prediction.timestamp.replace(tzinfo=None),  # Store as naive UTC
-                        prediction.risk_score,
-                        prediction.severity_level.value,
-                        prediction.confidence,
-                        prediction.time_to_impact_hours,
-                        prediction.affected_area_km2,
-                        prediction.risk_factors.model_dump_json(),
-                        json.dumps(prediction.recommended_actions)
-                    )
+                    try:
+                        await conn.execute("""
+                            INSERT INTO flood_predictions (
+                                id, zone_id, timestamp, risk_score, severity_level,
+                                confidence, time_to_impact_hours, affected_area_km2,
+                                risk_factors, recommended_actions
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                            ON CONFLICT (id) DO UPDATE SET
+                                risk_score = EXCLUDED.risk_score,
+                                severity_level = EXCLUDED.severity_level,
+                                confidence = EXCLUDED.confidence,
+                                risk_factors = EXCLUDED.risk_factors;
+                        """,
+                            prediction.id,
+                            prediction.zone.id,
+                            prediction.timestamp.replace(tzinfo=None),
+                            prediction.risk_score,
+                            prediction.severity_level.value,
+                            prediction.confidence,
+                            prediction.time_to_impact_hours,
+                            prediction.affected_area_km2,
+                            json.dumps(prediction.risk_factors.model_dump()) if hasattr(prediction.risk_factors, 'model_dump') else json.dumps(prediction.risk_factors),
+                            json.dumps(prediction.recommended_actions)
+                        )
+                        logger.info(f"Stored prediction for zone {prediction.zone.name}: risk={prediction.risk_score:.2f}")
+                    except Exception as e:
+                        logger.error(f"Failed to store prediction for zone {prediction.zone.name}: {e}")
+                        continue
             
             # Update zone monitoring timestamps
             for zone in self.sentinel_zones:

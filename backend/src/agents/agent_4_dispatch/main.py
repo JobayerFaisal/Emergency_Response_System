@@ -58,7 +58,7 @@ agent_state = {
 async def lifespan(app: FastAPI):
     global db_pool, redis_client, route_computer, safety_checker, dispatch_manager, ai_router
 
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://disaster_admin:disaster123@localhost:5432/disaster_response")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/disaster_response")
     REDIS_URL    = os.getenv("REDIS_URL",    "redis://localhost:6379")
     OSRM_URL     = os.getenv("OSRM_URL",     "http://localhost:5000")
 
@@ -270,6 +270,7 @@ def _parse_allocation(payload: dict):
     alloc.requires_medical     = payload.get("requires_medical", False)
     alloc.partial_allocation   = payload.get("partial_allocation", False)
     alloc.notes                = payload.get("notes", "")
+    alloc.num_people_affected = payload.get("num_people", 0)
     return alloc
 
 

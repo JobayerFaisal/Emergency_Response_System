@@ -34,9 +34,15 @@ async def publish_message(
         priority=priority,
         payload=payload,
     )
-    await redis.publish(channel, msg.model_dump_json())
+    # ── Publish to Redis (skip gracefully if unavailable) ──
+    try:
+        await redis.publish(channel, msg.model_dump_json())
+        logger.info("Published %s → %s (priority=%d)", message_type, channel, priority)
+    except Exception as e:
+        logger.warning("Redis unavailable — skipping publish to %s: %s", channel, e)
+
+    # ── Always log to DB ──
     await _log_to_db(db_pool, msg)
-    logger.info("Published %s → %s", message_type, channel)
     return msg
 
 

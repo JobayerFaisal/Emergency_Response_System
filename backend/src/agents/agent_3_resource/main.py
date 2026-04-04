@@ -22,8 +22,8 @@ from redis import asyncio as aioredis
 from uuid import UUID
 
 from shared.message_protocol import AgentMessage
-from .models import ResourceType, RestockRequest, InventorySnapshot
-from .inventory_manager import InventoryManager
+from src.agents.agent_3_resource.models import ResourceType, RestockRequest, InventorySnapshot
+from src.agents.agent_3_resource.inventory_manager import InventoryManager
 from .allocator import ResourceAllocator
 from .redis_handler import publish_message, listen_distress_queue
 from .seed_data import seed_initial_resources
@@ -50,7 +50,7 @@ agent_state = {
 async def lifespan(app: FastAPI):
     global db_pool, redis_client, inv_manager, allocator
 
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://disaster_admin:disaster123@localhost:5432/disaster_response")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/disaster_response")
     REDIS_URL    = os.getenv("REDIS_URL",    "redis://localhost:6379")
 
     # DB
