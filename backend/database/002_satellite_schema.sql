@@ -53,6 +53,13 @@ CREATE TABLE IF NOT EXISTS satellite_imagery_detections (
     geojson_data JSONB,  -- Complete GeoJSON of flood extent
     map_tile_urls JSONB,  -- URLs for map visualization
     
+    -- Agent 4 compatibility columns
+    -- FIX: Added so 005_agent_messages.sql ALTER ADD COLUMN IF NOT EXISTS is a no-op
+    -- and Agent 4's safety_checker can query this column directly.
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    flood_depth_m FLOAT,
+    zone_id_ref VARCHAR(100),
+
     -- Status and metadata
     processing_status VARCHAR(20) DEFAULT 'completed',
     error_message TEXT,

@@ -23,19 +23,25 @@ CREATE INDEX IF NOT EXISTS idx_agent_messages_type
 CREATE INDEX IF NOT EXISTS idx_agent_messages_zone
     ON agent_messages(zone_id, timestamp DESC);
 
--- ── STUB for Agent 1's flood detection table ──────────────────────────────
--- This allows Agent 4's safety_checker to compile even before Agent 1 merges.
--- Agent 1 will CREATE OR REPLACE this with the real schema.
--- Agent 4 handles the case gracefully (see safety_checker.py).
-CREATE TABLE IF NOT EXISTS satellite_imagery_detections (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    zone_id         VARCHAR(100),
-    risk_level      VARCHAR(20),
-    flood_depth_m   FLOAT,
-    flood_geometry  GEOGRAPHY(GEOMETRY, 4326),
-    is_active       BOOLEAN DEFAULT TRUE,
-    detected_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- ── satellite_imagery_detections compatibility ───────────────────────────
+-- The real table is created by 002_satellite_schema.sql (id SERIAL, no is_active).
+-- 005 must NOT redefine it — that causes the IF NOT EXISTS to skip creation
+-- while still trying to index a column that doesn't exist → ERROR.
+--
+-- FIX: Just add the columns Agent 4 needs if they are missing, then index safely.
 
+-- Add is_active if 002 didn't include it
+ALTER TABLE satellite_imagery_detections
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+
+-- Add zone_id alias if missing (002 has no zone_id column)
+ALTER TABLE satellite_imagery_detections
+    ADD COLUMN IF NOT EXISTS zone_id_ref VARCHAR(100);
+
+-- Add flood_depth_m if missing
+ALTER TABLE satellite_imagery_detections
+    ADD COLUMN IF NOT EXISTS flood_depth_m FLOAT;
+
+-- Now the index is safe because the column is guaranteed to exist
 CREATE INDEX IF NOT EXISTS idx_sat_detections_active
     ON satellite_imagery_detections(is_active);
