@@ -1,143 +1,216 @@
-version: '3.8'
+# version: '3.8'
+
+# ============================================================
+# Emergency Response System — Full Docker Compose
+# Runs: PostgreSQL+PostGIS, Redis, Agent 1, 2, 3, 4, Streamlit
+# Usage: docker-compose up --build
+# ============================================================
 
 services:
 
-  # PostgreSQL + PostGIS service
+  # ── Infrastructure ────────────────────────────────────────
+
   postgres:
     image: postgis/postgis:15-3.3
     container_name: disaster_postgres
     environment:
-      POSTGRES_DB: disaster_response
-      POSTGRES_USER: postgres             # matches DATABASE_URL user
-      POSTGRES_PASSWORD: postgres         # matches DATABASE_URL password
+      POSTGRES_DB:       disaster_response
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/database:/docker-entrypoint-initdb.d   # Auto-runs all .sql files on first start
     networks:
       - disaster_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d disaster_response"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Redis service (for inter-agent communication)
   redis:
     image: redis:7-alpine
     container_name: disaster_redis
     ports:
       - "6379:6379"
+    command: redis-server --timeout 0 --tcp-keepalive 60
     networks:
       - disaster_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Backend service (FastAPI)
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: disaster_backend
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      # IMPORTANT: inside Docker containers, use the service name "postgres"
-      # not "localhost" — localhost inside a container points to itself, not the DB.
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL: redis://redis:6379/0
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
-    env_file:
-      - .env
-    networks:
-      - disaster_network
+  # ── Agent 1: Environmental Intelligence ──────────────────
 
-  # Streamlit UI service
-  streamlit:
-    build:
-      context: ./backend/streamlit_app
-      dockerfile: Dockerfile
-    container_name: disaster_streamlit
-    depends_on:
-      - backend
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./backend/streamlit_app:/app
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL: redis://redis:6379/0
-    networks:
-      - disaster_network
-
-  # Agent 1 (Environmental Intelligence)
   agent1:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: agent1_environmental
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL: redis://redis:6379/0
-    volumes:
-      - ./backend:/app
+      DATABASE_URL:      postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:         redis://redis:6379
+      PYTHONPATH:        /app
+      AGENT_PORT:        "8001"
     env_file:
       - .env
     ports:
       - "8001:8001"
+    volumes:
+      - ./backend:/app
+      - ./backend/models:/app/models
     networks:
       - disaster_network
-    # Path inside container: /app/src/agents/agent_1_environmental/main.py
-    # (./backend is mounted to /app, and real path is backend/src/agents/...)
-    command: ["python", "src/agents/agent_1_environmental/main.py"]
+    command: >
+      uvicorn src.agents.agent_1_environmental.main:app
+      --host 0.0.0.0 --port 8001
+    restart: unless-stopped
 
-  # Agent 3 (Resource Management) — uncomment when ready
-  # agent3:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: agent3_resource
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   environment:
-  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
-  #     REDIS_URL: redis://redis:6379/0
-  #   ports:
-  #     - "8003:8003"
-  #   volumes:
-  #     - ./backend:/app
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - disaster_network
-  #   command: ["python", "src/agents/agent_3_resource/main.py"]
+  # ── Agent 2: Distress Intelligence ───────────────────────
 
-  # Agent 4 (Dispatch Optimization) — uncomment when ready
-  # agent4:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: agent4_dispatch
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   environment:
-  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
-  #     REDIS_URL: redis://redis:6379/0
-  #   ports:
-  #     - "8004:8004"
-  #   volumes:
-  #     - ./backend:/app
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - disaster_network
-  #   command: ["python", "src/agents/agent_4_dispatch/main.py"]
+  agent2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agent2_distress
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      agent1:
+        condition: service_started
+    environment:
+      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:          redis://redis:6379
+      PYTHONPATH:         /app
+      AGENT_PORT:         "8002"
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend:/app
+    networks:
+      - disaster_network
+    command: >
+      uvicorn src.agents.agent_2_distress.main:app
+      --host 0.0.0.0 --port 8002
+    restart: unless-stopped
+
+  # ── Agent 3: Resource Management ─────────────────────────
+
+  agent3:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agent3_resource
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:          redis://redis:6379
+      PYTHONPATH:         /app
+      AGENT_PORT:         "8003"
+    env_file:
+      - .env
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./backend:/app
+    networks:
+      - disaster_network
+    command: >
+      uvicorn src.agents.agent_3_resource.main:app
+      --host 0.0.0.0 --port 8003
+    restart: unless-stopped
+
+  # ── Agent 4: Dispatch Optimization ───────────────────────
+
+  agent4:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agent4_dispatch
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      agent3:
+        condition: service_started
+    environment:
+      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:          redis://redis:6379
+      OSRM_URL:           http://router.project-osrm.org
+      PYTHONPATH:         /app
+      AGENT_PORT:         "8004"
+    env_file:
+      - .env
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./backend:/app
+    networks:
+      - disaster_network
+    command: >
+      uvicorn src.agents.agent_4_dispatch.main:app
+      --host 0.0.0.0 --port 8004
+    restart: unless-stopped
+
+  # ── Streamlit Dashboard ───────────────────────────────────
+
+  streamlit:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: disaster_streamlit
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:          redis://redis:6379
+      PYTHONPATH:         /app
+      AGENT1_URL:         http://agent1:8001
+      AGENT2_URL:         http://agent2:8002
+      AGENT3_URL:         http://agent3:8003
+      AGENT4_URL:         http://agent4:8004
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./backend:/app
+    networks:
+      - disaster_network
+    command: >
+      streamlit run streamlit_app/app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+    restart: unless-stopped
 
 volumes:
   postgres_data:
-  # removed orphan volume "postgres_data_restore" — was declared but never mounted
 
 networks:
   disaster_network:
