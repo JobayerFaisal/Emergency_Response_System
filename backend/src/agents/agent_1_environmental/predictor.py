@@ -911,6 +911,22 @@ class FloodRiskPredictor:
             f"Confidence={confidence:.2f}, "
             f"Sources=[{', '.join(data_sources)}]"
         )
+
+        # --- Weather summary log line ---
+        if weather_data:
+            rain_1h  = weather_data.precipitation.rain_1h  or 0.0
+            rain_3h  = weather_data.precipitation.rain_3h  or 0.0
+            rain_24h = weather_data.precipitation.rain_24h or 0.0
+            logger.info(
+                f"  Weather: {weather_data.condition.value} | "
+                f"Temp={weather_data.metrics.temperature:.1f}C | "
+                f"Humidity={weather_data.metrics.humidity:.0f}% | "
+                f"Wind={weather_data.metrics.wind_speed:.1f}m/s | "
+                f"Rain(1h/3h/24h)={rain_1h:.1f}/{rain_3h:.1f}/{rain_24h:.1f}mm | "
+                f"Pressure={weather_data.metrics.pressure:.0f}hPa"
+            )
+        else:
+            logger.info("  Weather: no data available")
         
         return prediction
 
