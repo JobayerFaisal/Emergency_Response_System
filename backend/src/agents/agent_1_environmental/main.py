@@ -445,8 +445,22 @@ class EnvironmentalIntelligenceAgent:
             assert self.spatial_analyzer is not None, "Spatial analyzer not initialized"
             spatial_results = {}
             satellite_summary = {}
+
+            # FIX: Re-attach satellite data from collected_data into processed_data
+            # The data_processor drops the 'satellite' key since it only handles
+            # weather and social data. We rebuild the lookup by zone.id here.
+            collected_by_zone = {
+                str(c['zone'].id): c.get('satellite')
+                for c in collected_data
+                if c.get('zone') is not None
+            }
+
             for data in processed_data:
                 zone = data['zone']
+
+                # Re-attach satellite data from collected_data if missing
+                if 'satellite' not in data or data.get('satellite') is None:
+                    data['satellite'] = collected_by_zone.get(str(zone.id))
                 
                 # Store weather and social data
                 if data.get('weather'):
@@ -462,7 +476,6 @@ class EnvironmentalIntelligenceAgent:
                     )
                 
                 # Carry satellite data forward for prediction
-                # (it was collected in Step 1 alongside weather+social)
                 sat = data.get('satellite')
                 if sat and hasattr(sat, 'flood_detection') and sat.flood_detection:
                     fd = sat.flood_detection

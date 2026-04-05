@@ -63,6 +63,9 @@ services:
       REDIS_URL:         redis://redis:6379
       PYTHONPATH:        /app
       AGENT_PORT:        "8001"
+      FLOOD_MODEL_PATH:  /app/backend/models/flood_fast_best.keras
+      SAR_REF_START:     "2024-01-01"
+      SAR_REF_END:       "2024-04-06"
     env_file:
       - .env
     ports:
@@ -70,6 +73,7 @@ services:
     volumes:
       - .:/app
       - ./backend/models:/app/backend/models
+      - ./backend/config:/app/backend/config        # ← ADD THIS
       - ~/.config/earthengine:/root/.config/earthengine  # Mount Earth Engine credentials
     networks:
       - disaster_network
