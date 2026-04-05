@@ -59,3 +59,11 @@ credentials = service_account.Credentials.from_service_account_file(
 ee.Initialize(credentials=credentials)
 
 print("Earth Engine initialized successfully with the service account!")
+
+
+# Example: Checking for satellite data in Dhaka
+image = ee.ImageCollection('COPERNICUS/S1_GRD') \
+    .filterBounds(ee.Geometry.Point([90.4125, 23.8103]))  # Example for Dhaka, Bangladesh
+image = image.median()
+
+print(image.getInfo())

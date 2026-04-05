@@ -635,7 +635,7 @@ class EnvironmentalIntelligenceAgent:
         # Map severity to interval
         intervals = {
             SeverityLevel.CRITICAL: 60,      # 1 minute
-            SeverityLevel.HIGH: 180,         # 3 minutes
+            SeverityLevel.HIGH: 300,         # 5 minutes
             SeverityLevel.MODERATE: 300,     # 5 minutes
             SeverityLevel.LOW: 900,          # 15 minutes
             SeverityLevel.MINIMAL: 180      # 3 minutes

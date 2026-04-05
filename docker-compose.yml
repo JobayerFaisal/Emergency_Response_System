@@ -70,6 +70,7 @@ services:
     volumes:
       - .:/app
       - ./backend/models:/app/backend/models
+      - ~/.config/earthengine:/root/.config/earthengine  # Mount Earth Engine credentials
     networks:
       - disaster_network
     command: >
