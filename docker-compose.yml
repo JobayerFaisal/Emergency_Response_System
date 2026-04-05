@@ -14,9 +14,10 @@ services:
     image: postgis/postgis:15-3.3
     container_name: disaster_postgres
     environment:
-      POSTGRES_DB:       disaster_response
-      POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB:                disaster_response
+      POSTGRES_USER:              postgres
+      POSTGRES_PASSWORD:          postgres
+      POSTGRES_HOST_AUTH_METHOD:  trust
     ports:
       - "5432:5432"
     volumes:
@@ -48,8 +49,8 @@ services:
 
   agent1:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: agent1_environmental
     depends_on:
       postgres:
@@ -67,12 +68,12 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - ./backend:/app
-      - ./backend/models:/app/models
+      - .:/app
+      - ./backend/models:/app/backend/models
     networks:
       - disaster_network
     command: >
-      uvicorn src.agents.agent_1_environmental.main:app
+      uvicorn backend.src.agents.agent_1_environmental.main:app
       --host 0.0.0.0 --port 8001
     restart: unless-stopped
 
@@ -94,7 +95,7 @@ services:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
+      PYTHONPATH:         /app/backend
       AGENT_PORT:         "8002"
     env_file:
       - .env
@@ -125,7 +126,7 @@ services:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
+      PYTHONPATH:         /app/backend
       AGENT_PORT:         "8003"
     env_file:
       - .env
@@ -159,7 +160,7 @@ services:
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
       OSRM_URL:           http://router.project-osrm.org
-      PYTHONPATH:         /app
+      PYTHONPATH:         /app/backend
       AGENT_PORT:         "8004"
     env_file:
       - .env
@@ -190,7 +191,7 @@ services:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
+      PYTHONPATH:         /app/backend
       AGENT1_URL:         http://agent1:8001
       AGENT2_URL:         http://agent2:8002
       AGENT3_URL:         http://agent3:8003
