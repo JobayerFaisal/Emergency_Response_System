@@ -367,51 +367,99 @@ class EnvironmentalIntelligenceAgent:
     def _create_default_zones(self) -> List[SentinelZone]:
         """Create default sentinel zones for Dhaka, Bangladesh"""
         return [
+            # SentinelZone(
+            #     name="Dhaka Central",
+            #     center=GeoPoint(latitude=23.8103, longitude=90.4125),
+            #     radius_km=5.0,
+            #     risk_level=SeverityLevel.MODERATE,
+            #     population_density=45000,
+            #     elevation=6.0,
+            #     drainage_capacity="poor"
+            # ),
+            # SentinelZone(
+            #     name="Mirpur",
+            #     center=GeoPoint(latitude=23.8223, longitude=90.3654),
+            #     radius_km=4.0,
+            #     risk_level=SeverityLevel.HIGH,
+            #     population_density=52000,
+            #     elevation=4.0,
+            #     drainage_capacity="poor"
+            # ),
+            # SentinelZone(
+            #     name="Gulshan",
+            #     center=GeoPoint(latitude=23.7806, longitude=90.4175),
+            #     radius_km=3.0,
+            #     risk_level=SeverityLevel.LOW,
+            #     population_density=35000,
+            #     elevation=8.0,
+            #     drainage_capacity="moderate"
+            # ),
+            # SentinelZone(
+            #     name="Mohammadpur",
+            #     center=GeoPoint(latitude=23.7697, longitude=90.3611),
+            #     radius_km=4.0,
+            #     risk_level=SeverityLevel.MODERATE,
+            #     population_density=48000,
+            #     elevation=5.0,
+            #     drainage_capacity="poor"
+            # ),
+            # SentinelZone(
+            #     name="Uttara",
+            #     center=GeoPoint(latitude=23.8759, longitude=90.3795),
+            #     radius_km=4.5,
+            #     risk_level=SeverityLevel.MODERATE,
+            #     population_density=42000,
+            #     elevation=7.0,
+            #     drainage_capacity="moderate"
+            # )
             SentinelZone(
-                name="Dhaka Central",
-                center=GeoPoint(latitude=23.8103, longitude=90.4125),
-                radius_km=5.0,
-                risk_level=SeverityLevel.MODERATE,
-                population_density=45000,
-                elevation=6.0,
+                name="Sunamganj Sadar",          # Haor region — floods every year
+                center=GeoPoint(latitude=24.8660, longitude=91.3990),
+                radius_km=6.0,
+                risk_level=SeverityLevel.CRITICAL,
+                population_density=28000,
+                elevation=2.0,                   # Very low — 2m above sea level
                 drainage_capacity="poor"
             ),
             SentinelZone(
-                name="Mirpur",
-                center=GeoPoint(latitude=23.8223, longitude=90.3654),
-                radius_km=4.0,
+                name="Sylhet City",              # 2022 worst flood — 84% submerged
+                center=GeoPoint(latitude=24.8975, longitude=91.8720),
+                radius_km=5.0,
                 risk_level=SeverityLevel.HIGH,
-                population_density=52000,
+                population_density=35000,
+                elevation=3.5,
+                drainage_capacity="poor"
+            ),
+            SentinelZone(
+                name="Netrokona Sadar",          # Haor district — regular flooding
+                center=GeoPoint(latitude=24.8703, longitude=90.7279),
+                radius_km=5.0,
+                risk_level=SeverityLevel.HIGH,
+                population_density=22000,
+                elevation=3.0,
+                drainage_capacity="poor"
+            ),
+            SentinelZone(
+                name="Sirajganj Sadar",          # Jamuna river corridor — annual floods
+                center=GeoPoint(latitude=24.4490, longitude=89.7000),
+                radius_km=5.0,
+                risk_level=SeverityLevel.HIGH,
+                population_density=31000,
                 elevation=4.0,
                 drainage_capacity="poor"
             ),
             SentinelZone(
-                name="Gulshan",
-                center=GeoPoint(latitude=23.7806, longitude=90.4175),
-                radius_km=3.0,
-                risk_level=SeverityLevel.LOW,
-                population_density=35000,
-                elevation=8.0,
-                drainage_capacity="moderate"
-            ),
-            SentinelZone(
-                name="Mohammadpur",
-                center=GeoPoint(latitude=23.7697, longitude=90.3611),
-                radius_km=4.0,
-                risk_level=SeverityLevel.MODERATE,
-                population_density=48000,
-                elevation=5.0,
+                name="Jamalpur Sadar",           # Brahmaputra floodplain — severely flood-prone
+                center=GeoPoint(latitude=24.9000, longitude=89.9333),
+                radius_km=5.5,
+                risk_level=SeverityLevel.HIGH,
+                population_density=29000,
+                elevation=3.5,
                 drainage_capacity="poor"
-            ),
-            SentinelZone(
-                name="Uttara",
-                center=GeoPoint(latitude=23.8759, longitude=90.3795),
-                radius_km=4.5,
-                risk_level=SeverityLevel.MODERATE,
-                population_density=42000,
-                elevation=7.0,
-                drainage_capacity="moderate"
             )
+
+
+
         ]
     
     async def run_monitoring_cycle(self) -> AgentOutput:

@@ -67,7 +67,7 @@ class PostGISSpatialAnalyzer:
             # Sentinel zones table
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sentinel_zones (
-                    id UUID PRIMARY KEY,
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     name VARCHAR(255) NOT NULL,
                     center GEOMETRY(Point, 4326) NOT NULL,
                     radius_km FLOAT NOT NULL,

@@ -256,7 +256,7 @@ class SatelliteDataCollector:
     """
     Async-compatible satellite data collector using GEE Sentinel-1 SAR.
 
-    Integrates with the DataCollectionOrchestrator alongside
+    Integrates with the  alongside
     WeatherAPICollector and SocialMediaCollector.
     """
 
