@@ -1,0 +1,82 @@
+/* ============================================================
+   map.css — MapLibre popup + control overrides
+   ============================================================ */
+
+/* ── Popup ─────────────────────────────────────────────── */
+.maplibregl-popup-content {
+  background: var(--bg-2) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-hi);
+  border-radius: 6px !important;
+  padding: 10px 14px !important;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+  min-width: 160px;
+}
+
+.maplibregl-popup-content strong {
+  color: var(--accent);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--border-hi) !important;
+}
+
+.maplibregl-popup-close-button {
+  color: var(--text-muted) !important;
+  font-size: 16px !important;
+  padding: 4px 8px !important;
+}
+.maplibregl-popup-close-button:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-3) !important;
+}
+
+/* ── Navigation controls ───────────────────────────────── */
+.maplibregl-ctrl-group {
+  background: var(--bg-1) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.maplibregl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+.maplibregl-ctrl-group button:hover {
+  background: var(--bg-3) !important;
+}
+
+.maplibregl-ctrl-icon {
+  filter: invert(60%) sepia(30%) saturate(400%) hue-rotate(185deg);
+}
+
+/* ── Scale bar ─────────────────────────────────────────── */
+.maplibregl-ctrl-scale {
+  background: rgba(7, 11, 18, 0.7) !important;
+  border-color: var(--border) !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+}
+
+/* ── Attribution ───────────────────────────────────────── */
+.maplibregl-ctrl-attrib {
+  background: rgba(7, 11, 18, 0.6) !important;
+  color: var(--text-muted) !important;
+  font-size: 9px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--text-muted) !important;
+}
