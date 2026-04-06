@@ -40,7 +40,8 @@ from backend.src.agents.agent_1_environmental.models import (
 from backend.src.agents.agent_1_environmental.data_collectors import (
     WeatherAPICollector,
     SocialMediaCollector,
-    DataCollectionOrchestrator
+    DataCollectionOrchestrator,
+    RiverLevelCollector
 )
 from backend.src.agents.agent_1_environmental.services.satellite_service import SatelliteDataCollector
 from backend.src.agents.agent_1_environmental.data_processors import (
@@ -158,6 +159,7 @@ class EnvironmentalIntelligenceAgent:
         self.social_collector: Optional[SocialMediaCollector] = None
         self.collection_orchestrator: Optional[DataCollectionOrchestrator] = None
         self.satellite_collector: Optional[SatelliteDataCollector] = None
+        self.river_collector: Optional[RiverLevelCollector] = None
         self.llm_processor: Optional[LLMEnrichmentProcessor] = None
         self.weather_normalizer: Optional[WeatherDataNormalizer] = None
         self.social_analyzer: Optional[SocialMediaAnalyzer] = None
@@ -238,10 +240,18 @@ class EnvironmentalIntelligenceAgent:
                 logger.warning(f"Satellite collector unavailable: {e} — continuing without satellite data")
                 self.satellite_collector = None
             
+            # Initialize river level collector (GloFAS — no API key needed)
+            self.river_collector = RiverLevelCollector(
+                cache_client=self.redis_client
+            )
+            logger.info("River level collector initialized (GloFAS v4)")
+
+
             self.collection_orchestrator = DataCollectionOrchestrator(
                 weather_collector=self.weather_collector,
                 social_collector=self.social_collector,
-                satellite_collector=self.satellite_collector
+                satellite_collector=self.satellite_collector,
+                river_collector=self.river_collector
             )
             logger.info("Data collectors initialized")
             
@@ -522,6 +532,11 @@ class EnvironmentalIntelligenceAgent:
                         post,
                         str(zone.id)
                     )
+
+                # Forward river data to processed_data for predictor
+                river = data.get('river_data')
+                if river:
+                    data['river_data'] = river
                 
                 # Carry satellite data forward for prediction
                 sat = data.get('satellite')
@@ -611,7 +626,12 @@ class EnvironmentalIntelligenceAgent:
             
             # Determine next update interval (adaptive polling)
             next_update = self._calculate_next_update_interval(predictions)
-            
+
+            # Create agent output
+            river_zones_ok = sum(
+                1 for d in processed_data
+                if d.get('river_data') is not None
+            )            
             # Create agent output
             output = AgentOutput(
                 agent_id=self.config.agent_id,
@@ -623,7 +643,8 @@ class EnvironmentalIntelligenceAgent:
                     'weather_api': 'operational',
                     'social_media': 'operational',
                     'spatial_db': 'operational',
-                    'satellite_gee': 'operational' if satellite_summary else 'unavailable'
+                    'satellite_gee': 'operational' if satellite_summary else 'unavailable',
+                    'river_glofas':  f'operational ({river_zones_ok}/{len(processed_data)} zones)' if river_zones_ok else 'unavailable',
                 },
                 processing_time_seconds=processing_time,
                 next_update_in_seconds=next_update

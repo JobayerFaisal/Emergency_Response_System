@@ -320,6 +320,41 @@ class FloodRiskPredictor:
         
         return min(factor, 1.0), True
     
+    def calculate_river_level_factor(
+        self,
+        river_data: Optional[Dict[str, Any]]
+    ) -> Tuple[float, bool]:
+        """
+        Convert GloFAS river discharge data into a 0-1 risk factor.
+
+        The factor is already computed by RiverLevelCollector._compute_risk_factor()
+        using the discharge ratio (current / 7-day average). This method simply
+        extracts it and returns a (factor, has_data) tuple consistent with the
+        social media factor pattern.
+
+        Args:
+            river_data: Dict from RiverLevelCollector.fetch_river_data(), or None.
+                Expected keys: risk_factor, discharge_ratio, trend,
+                               current_discharge_m3s, past_7day_avg_m3s
+
+        Returns:
+            Tuple of (risk_factor 0-1, has_data bool)
+        """
+        if not river_data or river_data.get("risk_factor") is None:
+            return 0.0, False
+
+        factor = float(river_data["risk_factor"])
+        ratio  = river_data.get("discharge_ratio", 1.0)
+        trend  = river_data.get("trend", "stable")
+
+        logger.info(
+            f"  River factor: {factor:.3f} "
+            f"(discharge={river_data.get('current_discharge_m3s', 0):.1f} m³/s, "
+            f"ratio={ratio:.2f}x avg, trend={trend})"
+        )
+
+        return min(factor, 1.0), True
+
     def calculate_drainage_factor(self, zone: SentinelZone) -> float:
         """
         Calculate drainage capacity factor (1=poor, 0=excellent).
@@ -383,7 +418,8 @@ class FloodRiskPredictor:
         social_analysis: Dict[str, Any],
         historical_risk: float,
         satellite_data: Optional[Dict[str, Any]] = None,
-        depth_data: Optional[Dict[str, Any]] = None
+        depth_data: Optional[Dict[str, Any]] = None,
+        river_data: Optional[Dict[str, Any]] = None
     ) -> FloodRiskFactors:
         """
         Calculate all 8 risk factors and return a FloodRiskFactors object
@@ -398,6 +434,8 @@ class FloodRiskPredictor:
                            satellite_flood_area_km2 keys. None if unavailable.
             depth_data: Dict from DepthPredictor.analyze() with statistics
                        sub-dict. None if unavailable.
+            river_data: Dict from RiverLevelCollector.fetch_river_data().
+                        None if GIoFAS unavailable.
             
         Returns:
             Complete risk factors with metadata flags
@@ -470,7 +508,12 @@ class FloodRiskPredictor:
             logger.debug(
                 "  Social media data: not available — weight redistributed"
             )
-        
+
+        # River level factor (GloFAS — 9th factor)
+        river_factor, has_river = self.calculate_river_level_factor(river_data)
+        if not has_river:
+            logger.debug( "  River level data: not available — using weather-only mode" )
+
         # Zone factors
         drainage = self.calculate_drainage_factor(zone)
         elevation = self.calculate_elevation_factor(zone)
@@ -489,12 +532,14 @@ class FloodRiskPredictor:
             # Optional
             social_reports_density=social_factor,
             historical_risk=historical_risk,
+            river_level_factor=river_factor,
             # Metadata for dynamic weighting
             has_satellite_data=has_satellite,
             has_social_data=has_social,
+            has_river_data=has_river,
             satellite_confirmed_flooding=satellite_confirmed,
         )
-    
+     
     # -----------------------------------------------------------------
     # CONFIDENCE CALCULATION
     # -----------------------------------------------------------------
@@ -574,7 +619,7 @@ class FloodRiskPredictor:
     # -----------------------------------------------------------------
     # TIME TO IMPACT
     # -----------------------------------------------------------------
-    
+
     def estimate_time_to_impact(
         self,
         severity: SeverityLevel,
@@ -762,7 +807,8 @@ class FloodRiskPredictor:
         spatial_analysis: SpatialAnalysisResult,
         historical_risk: float,
         satellite_data: Optional[Dict[str, Any]] = None,
-        depth_data: Optional[Dict[str, Any]] = None
+        depth_data: Optional[Dict[str, Any]] = None,
+        river_data: Optional[Dict[str, Any]] = None,
     ) -> FloodPrediction:
         """
         Generate comprehensive flood risk prediction using 8-factor model.
@@ -777,7 +823,8 @@ class FloodRiskPredictor:
             satellite_data: Dict with satellite_risk, satellite_flood_pct,
                            satellite_flood_area_km2. None if unavailable.
             depth_data: Dict from DepthPredictor.analyze(). None if unavailable.
-            
+            river_data: Dict from RiverLevelCollector.fetch_river_data(). None if unavailable.
+
         Returns:
             Complete flood prediction
         """
@@ -790,7 +837,8 @@ class FloodRiskPredictor:
             social_analysis=social_analysis,
             historical_risk=historical_risk,
             satellite_data=satellite_data,
-            depth_data=depth_data
+            depth_data=depth_data,
+            river_data=river_data
         )
         
         # --- Step 2: Get overall risk score (dynamic weighting in model) ---
@@ -904,6 +952,8 @@ class FloodRiskPredictor:
             data_sources.append("depth")
         if risk_factors.has_social_data:
             data_sources.append("social")
+        if risk_factors.has_river_data:
+            data_sources.append("river")
         
         logger.info(
             f"Prediction complete: {zone.name} — "
@@ -1143,6 +1193,9 @@ class PredictionOrchestrator:
         normalized_weather = processed_data.get('normalized_weather')
         social_analysis = processed_data.get('social_analysis', {})
         
+        # --- Extract river level data (if collector attached it) ---
+        river_data = processed_data.get('river_data', None)
+
         # --- Extract satellite data (if main.py attached it) ---
         satellite_data = None
         if processed_data.get('satellite_flood_pct') is not None:
@@ -1195,7 +1248,8 @@ class PredictionOrchestrator:
             spatial_analysis=spatial_analysis,
             historical_risk=historical_risk,
             satellite_data=satellite_data,
-            depth_data=depth_data
+            depth_data=depth_data,
+            river_data=river_data
         )
         
         # Generate alert if severity warrants it

@@ -1,5 +1,3 @@
-# backend/src/agents/agent_1_environmental/data_collectors.py
-
 """
 Data Collectors for Environmental Intelligence Agent
 =====================================================
@@ -630,7 +628,259 @@ class SocialMediaCollector:
                 zone_posts[str(zone.id)] = []
         
         return zone_posts
+# =====================================================================
+# RIVER LEVEL COLLECTOR (GloFAS via Open-Meteo Flood API)
+# =====================================================================
 
+class RiverLevelCollector:
+    """
+    Collects river discharge data from the Open-Meteo Flood API,
+    which is powered by GloFAS v4 (Global Flood Awareness System).
+
+    No API key required — free and open.
+    Endpoint: https://flood-api.open-meteo.com/v1/flood
+
+    For each zone it returns:
+      - current_discharge_m3s  : today's river discharge (m³/s)
+      - past_7day_avg_m3s      : 7-day rolling average (baseline)
+      - forecast_7day_peak_m3s : highest forecast discharge in next 7 days
+      - discharge_ratio        : current / past_avg (>1.5 = elevated, >2.5 = high risk)
+      - trend                  : 'rising', 'stable', or 'falling'
+      - risk_factor            : normalized 0-1 score for the predictor
+    """
+
+    # Flood stage thresholds for Bangladesh rivers (m³/s).
+    # These represent typical values — rivers feeding the Brahmaputra/Jamuna
+    # basin are much larger than those feeding the Surma/Barak basin.
+    # The risk_factor is computed from discharge_ratio so it stays
+    # scale-independent, making these thresholds only used for logging.
+    FLOOD_STAGE_APPROX = {
+        "Sunamganj Sadar": 5_000,    # Surma river
+        "Sylhet City":     4_000,    # Surma/Kushiyara
+        "Netrokona Sadar": 3_000,    # Old Brahmaputra
+        "Sirajganj Sadar": 50_000,   # Jamuna (main channel)
+        "Jamalpur Sadar":  40_000,   # Jamuna/Brahmaputra
+    }
+
+    API_URL = "https://flood-api.open-meteo.com/v1/flood"
+
+    def __init__(
+        self,
+        cache_client=None,
+        cache_ttl: int = 3600,      # 1 hour — GloFAS updates daily
+        request_timeout: int = 15,
+    ):
+        self.cache_client = cache_client
+        self.cache_ttl    = cache_ttl
+        self.timeout      = aiohttp.ClientTimeout(total=request_timeout)
+        logger.info("RiverLevelCollector initialized (GloFAS v4 via Open-Meteo)")
+
+    def _compute_risk_factor(
+        self,
+        current: float,
+        past_avg: float,
+        forecast_peak: float,
+    ) -> float:
+        """
+        Convert raw discharge numbers into a 0-1 risk factor.
+
+        Uses the discharge ratio (current / past_7day_avg) as the
+        primary signal so the factor is scale-independent across the
+        vastly different river sizes in Bangladesh.
+
+        Mapping:
+          ratio < 1.0  → 0.0  (discharge falling / below average)
+          ratio = 1.0  → 0.10 (normal flow)
+          ratio = 1.5  → 0.30 (elevated — worth watching)
+          ratio = 2.0  → 0.50 (significantly elevated)
+          ratio = 3.0  → 0.70 (high flood risk)
+          ratio = 5.0  → 0.90 (very high)
+          ratio >= 7.0 → 1.00 (extreme)
+
+        A secondary boost is applied when the 7-day forecast peak
+        is also elevated (rising trend confirmed by model).
+        """
+        if past_avg <= 0:
+            return 0.0
+
+        ratio = current / past_avg
+
+        if ratio < 1.0:
+            base = 0.0
+        elif ratio < 1.5:
+            base = 0.0 + ((ratio - 1.0) / 0.5) * 0.30
+        elif ratio < 2.0:
+            base = 0.30 + ((ratio - 1.5) / 0.5) * 0.20
+        elif ratio < 3.0:
+            base = 0.50 + ((ratio - 2.0) / 1.0) * 0.20
+        elif ratio < 5.0:
+            base = 0.70 + ((ratio - 3.0) / 2.0) * 0.20
+        elif ratio < 7.0:
+            base = 0.90 + ((ratio - 5.0) / 2.0) * 0.05
+        else:
+            base = min(0.95 + ((ratio - 7.0) / 5.0) * 0.05, 1.0)
+
+        # Boost if forecast peak is also elevated (trend confirmation)
+        if past_avg > 0 and forecast_peak > 0:
+            forecast_ratio = forecast_peak / past_avg
+            if forecast_ratio > ratio:          # river still rising
+                boost = min((forecast_ratio - ratio) / 5.0, 0.10)
+                base  = min(base + boost, 1.0)
+
+        return round(base, 4)
+
+    @staticmethod
+    def _compute_trend(values: list[float]) -> str:
+        """Determine trend from a time-ordered list of discharge values."""
+        if len(values) < 3:
+            return "stable"
+        recent = values[-3:]
+        if recent[-1] > recent[0] * 1.05:
+            return "rising"
+        elif recent[-1] < recent[0] * 0.95:
+            return "falling"
+        return "stable"
+
+    async def fetch_river_data(self, zone) -> Optional[dict]:
+        """
+        Fetch GloFAS river discharge for a single zone.
+
+        Returns a dict with keys:
+            zone_name, current_discharge_m3s, past_7day_avg_m3s,
+            forecast_7day_peak_m3s, discharge_ratio, trend, risk_factor
+        Or None if the API is unreachable or returns no data.
+        """
+        cache_key = f"river:{zone.id}"
+
+        # Check cache first
+        if self.cache_client:
+            try:
+                cached = await self.cache_client.get(cache_key)
+                if cached:
+                    import json
+                    return json.loads(cached)
+            except Exception:
+                pass  # Cache miss — continue to API
+
+        params = {
+            "latitude":      zone.center.latitude,
+            "longitude":     zone.center.longitude,
+            "daily":         "river_discharge",
+            "past_days":     7,
+            "forecast_days": 7,
+        }
+
+        try:
+            async with ClientSession(timeout=self.timeout) as session:
+                async with session.get(self.API_URL, params=params) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        logger.warning(
+                            f"[{zone.name}] GloFAS API {resp.status}: {body[:120]}"
+                        )
+                        return None
+
+                    data = await resp.json()
+
+        except asyncio.TimeoutError:
+            logger.warning(f"[{zone.name}] GloFAS request timed out")
+            return None
+        except ClientError as e:
+            logger.warning(f"[{zone.name}] GloFAS connection error: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"[{zone.name}] GloFAS unexpected error: {e}")
+            return None
+
+        # Parse response
+        daily      = data.get("daily", {})
+        times      = daily.get("time", [])
+        discharges = daily.get("river_discharge", [])
+
+        if not times or not discharges:
+            logger.warning(
+                f"[{zone.name}] GloFAS returned empty data — "
+                "river may be outside 5 km grid cell. "
+                "Consider shifting coordinates by ±0.1°."
+            )
+            return None
+
+        today = datetime.now(timezone.utc).date().isoformat()
+
+        past_vals     = []
+        current_val   = None
+        forecast_vals = []
+
+        for t, d in zip(times, discharges):
+            if d is None:
+                continue
+            if t < today:
+                past_vals.append(d)
+            elif t == today:
+                current_val = d
+            else:
+                forecast_vals.append(d)
+
+        if current_val is None and past_vals:
+            current_val = past_vals[-1]   # Use most recent past if today missing
+
+        if current_val is None:
+            logger.warning(f"[{zone.name}] GloFAS: no current discharge value")
+            return None
+
+        past_avg      = sum(past_vals) / len(past_vals) if past_vals else current_val
+        forecast_peak = max(forecast_vals) if forecast_vals else current_val
+        ratio         = current_val / past_avg if past_avg > 0 else 1.0
+        trend         = self._compute_trend(past_vals + [current_val])
+        risk_factor   = self._compute_risk_factor(current_val, past_avg, forecast_peak)
+
+        result = {
+            "zone_name":               zone.name,
+            "current_discharge_m3s":   round(current_val,   1),
+            "past_7day_avg_m3s":       round(past_avg,      1),
+            "forecast_7day_peak_m3s":  round(forecast_peak, 1),
+            "discharge_ratio":         round(ratio,         3),
+            "trend":                   trend,
+            "risk_factor":             risk_factor,
+            "actual_lat":              data.get("latitude",  zone.center.latitude),
+            "actual_lon":              data.get("longitude", zone.center.longitude),
+        }
+
+        logger.info(
+            f"  [{zone.name}] River: {current_val:.1f} m³/s "
+            f"(avg={past_avg:.1f}, ratio={ratio:.2f}x, "
+            f"trend={trend}, risk={risk_factor:.3f})"
+        )
+
+        # Cache result
+        if self.cache_client:
+            try:
+                import json
+                await self.cache_client.setex(
+                    cache_key, self.cache_ttl, json.dumps(result)
+                )
+            except Exception:
+                pass
+
+        return result
+
+    async def fetch_multiple_zones(self, zones: list) -> dict[str, Optional[dict]]:
+        """Fetch river data for all zones concurrently."""
+        tasks   = [self.fetch_river_data(zone) for zone in zones]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        zone_data: dict[str, Optional[dict]] = {}
+        for zone, result in zip(zones, results):
+            zid = str(zone.id)
+            if isinstance(result, Exception):
+                logger.error(f"River fetch error for {zone.name}: {result}")
+                zone_data[zid] = None
+            elif isinstance(result, dict):
+                zone_data[zid] = result
+            else:
+                zone_data[zid] = None
+
+        return zone_data
 
 # =====================================================================
 # COLLECTOR ORCHESTRATOR
@@ -646,7 +896,8 @@ class DataCollectionOrchestrator:
         self,
         weather_collector: WeatherAPICollector,
         social_collector: Optional[SocialMediaCollector],  # FIX: Optional — may be None when token missing
-        satellite_collector: Optional[SatelliteDataCollector] = None
+        satellite_collector: Optional[SatelliteDataCollector] = None,
+        river_collector: Optional[RiverLevelCollector] = None,    # 9th factor
     ):
         """
         Initialize orchestrator.
@@ -655,10 +906,12 @@ class DataCollectionOrchestrator:
             weather_collector: Weather API collector instance
             social_collector: Social media collector instance (None if token not configured)
             satellite_collector: Satellite imagery collector instance (optional)
+            river_collector: River level collector instance (optional)
         """
         self.weather_collector = weather_collector
         self.social_collector = social_collector
         self.satellite_collector = satellite_collector
+        self.river_collector = river_collector
         
         # Adaptive polling intervals (seconds)
         self.polling_intervals = {
@@ -736,6 +989,14 @@ class DataCollectionOrchestrator:
             social_posts = []
             satellite = None
         
+        # Fetch river level data independently (fast HTTP, always async)
+        river_data = None
+        if self.river_collector is not None:
+            try:
+                river_data = await self.river_collector.fetch_river_data(zone)
+            except Exception as e:
+                logger.warning(f"  [{zone.name}] River data fetch failed: {e}")
+
         # Build merged result
         result = {
             'zone': zone,
@@ -743,6 +1004,7 @@ class DataCollectionOrchestrator:
             'forecast': forecast if not isinstance(forecast, Exception) else [],
             'social_posts': social_posts if not isinstance(social_posts, Exception) else [],
             'satellite': satellite if (satellite is not None and not isinstance(satellite, Exception)) else None,
+            'river': river_data if (river_data is not None and not isinstance(river_data, Exception)) else None, # GloFAS discharge dict or None
             'collected_at': datetime.now(timezone.utc)
         }
         
