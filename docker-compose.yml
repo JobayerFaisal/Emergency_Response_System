@@ -1,4 +1,3 @@
-# version: '3.8'
 
 # ============================================================
 # Emergency Response System — Full Docker Compose
@@ -182,38 +181,21 @@ services:
 
   # ── Streamlit Dashboard ───────────────────────────────────
 
-  streamlit:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: disaster_streamlit
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app/backend
-      AGENT1_URL:         http://agent1:8001
-      AGENT2_URL:         http://agent2:8002
-      AGENT3_URL:         http://agent3:8003
-      AGENT4_URL:         http://agent4:8004
-    env_file:
-      - .env
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./backend:/app
-    networks:
-      - disaster_network
-    command: >
-      streamlit run streamlit_app/app.py
-      --server.port 8501
-      --server.address 0.0.0.0
-    restart: unless-stopped
+frontend:
+  build: ./frontend
+  ports:
+    - "3000:3000"
+  depends_on:
+    - backend
+
+dashboard_api:
+  build: ./backend
+  command: uvicorn app.main:app --host 0.0.0.0 --port 8005
+  ports:
+    - "8005:8005"
+  depends_on:
+    - postgres
+    - redis
 
 volumes:
   postgres_data:
