@@ -504,11 +504,18 @@ class EnvironmentalIntelligenceAgent:
             spatial_results = {}
             satellite_summary = {}
 
-            # FIX: Re-attach satellite data from collected_data into processed_data
-            # The data_processor drops the 'satellite' key since it only handles
-            # weather and social data. We rebuild the lookup by zone.id here.
+            # Re-attach satellite AND river data from collected_data into processed_data.
+            # DataProcessingOrchestrator only handles weather/social and passes the rest
+            # of the dict through — but 'satellite' and 'river' keys come from the
+            # collector output and must be explicitly re-attached here before prediction.
             collected_by_zone = {
                 str(c['zone'].id): c.get('satellite')
+                for c in collected_data
+                if c.get('zone') is not None
+            }
+            # River data is stored under key 'river' in collector output (not 'river_data')
+            river_by_zone = {
+                str(c['zone'].id): c.get('river')
                 for c in collected_data
                 if c.get('zone') is not None
             }
@@ -533,10 +540,11 @@ class EnvironmentalIntelligenceAgent:
                         str(zone.id)
                     )
 
-                # Forward river data to processed_data for predictor
-                river = data.get('river_data')
-                if river:
-                    data['river_data'] = river
+                # Re-attach river data from collected_data.
+                # The collector stores it under 'river', but the predictor expects
+                # 'river_data'. processed_data never had this key — attach it now.
+                if not data.get('river_data'):
+                    data['river_data'] = river_by_zone.get(str(zone.id))
                 
                 # Carry satellite data forward for prediction
                 sat = data.get('satellite')
