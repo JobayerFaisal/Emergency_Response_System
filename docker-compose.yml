@@ -188,29 +188,29 @@ services:
       depends_on:
         - dashboard_api             # ← ADD: wait for dashboard_api to start
 
-dashboard_api:
-  build:
-    context: .          # ← whole repo, not just ./backend
-    dockerfile: backend/Dockerfile
-  command: uvicorn backend.src.agents.agent_1_environmental.main:app --host 0.0.0.0 --port 8005
-  ports:
-    - "8005:8005"
-  environment:
-    DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-    DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-    REDIS_URL:          redis://redis:6379
-    PYTHONPATH:         /app        # ← matches agent1
-  env_file:
-    - .env
-  volumes:
-    - .:/app            # ← whole repo, not just backend
-  networks:
-    - disaster_network
-  depends_on:
-    postgres:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
+  dashboard_api:
+    build:
+      context: .          # ← whole repo, not just ./backend
+      dockerfile: backend/Dockerfile
+    command: uvicorn backend.src.agents.agent_1_environmental.main:app --host 0.0.0.0 --port 8005
+    ports:
+      - "8005:8005"
+    environment:
+      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:          redis://redis:6379
+      PYTHONPATH:         /app        # ← matches agent1
+    env_file:
+      - .env
+    volumes:
+      - .:/app            # ← whole repo, not just backend
+    networks:
+      - disaster_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:
