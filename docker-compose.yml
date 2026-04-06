@@ -179,20 +179,39 @@ services:
       --host 0.0.0.0 --port 8004
     restart: unless-stopped
 
-
-  frontend:
+frontend:
     build: ./frontend
     ports:
       - "3000:3000"
-
-  dashboard_api:
-    build: ./backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8005
-    ports:
-      - "8005:8005"
+    networks:
+      - disaster_network          # ← ADD: must be on same network as dashboard_api
     depends_on:
-      - postgres
-      - redis
+      - dashboard_api             # ← ADD: wait for dashboard_api to start
+
+    dashboard_api:
+      build:
+        context: ./backend          # ← CHANGE: be explicit about context
+        dockerfile: Dockerfile
+      command: uvicorn src.agents.agent_1_environmental.main:app --host 0.0.0.0 --port 8005
+      #         ↑ CHANGE: fix the module path — replace 'app.main:app' with your actual path
+      ports:
+        - "8005:8005"
+      environment:
+        DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
+        DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
+        REDIS_URL:          redis://redis:6379
+        PYTHONPATH:         /app/backend   # ← ADD: so Python can find your modules
+      env_file:
+        - .env
+      volumes:
+        - ./backend:/app             # ← ADD: mount the code
+      networks:
+        - disaster_network           # ← ADD: critical fix for nginx hostname resolution
+      depends_on:
+        postgres:
+          condition: service_healthy
+        redis:
+          condition: service_healthy
 
 
 volumes:
@@ -201,3 +220,7 @@ volumes:
 networks:
   disaster_network:
     driver: bridge
+
+
+
+    
