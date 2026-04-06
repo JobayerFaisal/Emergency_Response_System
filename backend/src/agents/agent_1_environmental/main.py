@@ -423,51 +423,95 @@ class EnvironmentalIntelligenceAgent:
             #     drainage_capacity="moderate"
             # )
             SentinelZone(
-                name="Sunamganj Sadar",          # Haor region — floods every year
-                center=GeoPoint(latitude=24.8660, longitude=91.3990),
-                radius_km=6.0,
-                risk_level=SeverityLevel.CRITICAL,
-                population_density=28000,
-                elevation=2.0,                   # Very low — 2m above sea level
-                drainage_capacity="poor"
-            ),
-            SentinelZone(
-                name="Sylhet City",              # 2022 worst flood — 84% submerged
-                center=GeoPoint(latitude=24.8975, longitude=91.8720),
-                radius_km=5.0,
-                risk_level=SeverityLevel.HIGH,
-                population_density=35000,
-                elevation=3.5,
-                drainage_capacity="poor"
-            ),
-            SentinelZone(
-                name="Netrokona Sadar",          # Haor district — regular flooding
-                center=GeoPoint(latitude=24.8703, longitude=90.7279),
-                radius_km=5.0,
-                risk_level=SeverityLevel.HIGH,
-                population_density=22000,
-                elevation=3.0,
-                drainage_capacity="poor"
-            ),
-            SentinelZone(
-                name="Sirajganj Sadar",          # Jamuna river corridor — annual floods
-                center=GeoPoint(latitude=24.4490, longitude=89.7000),
-                radius_km=5.0,
-                risk_level=SeverityLevel.HIGH,
-                population_density=31000,
-                elevation=4.0,
-                drainage_capacity="poor"
-            ),
-            SentinelZone(
-                name="Jamalpur Sadar",           # Brahmaputra floodplain — severely flood-prone
-                center=GeoPoint(latitude=24.9000, longitude=89.9333),
-                radius_km=5.5,
-                risk_level=SeverityLevel.HIGH,
-                population_density=29000,
-                elevation=3.5,
-                drainage_capacity="poor"
-            )
-
+            name="Badakhshan Province",        # Severe flooding, landslides, high casualties
+            center=GeoPoint(latitude=36.7340, longitude=70.8110),
+            radius_km=25.0,
+            risk_level=SeverityLevel.CRITICAL,
+            population_density=12000,
+            elevation=1500.0,                  # Mountainous but vulnerable to flash floods
+            drainage_capacity="poor"
+        ),
+        SentinelZone(
+            name="Baghlan Province",           # One of the worst-hit flood zones
+            center=GeoPoint(latitude=36.1300, longitude=68.7000),
+            radius_km=20.0,
+            risk_level=SeverityLevel.CRITICAL,
+            population_density=15000,
+            elevation=500.0,
+            drainage_capacity="poor"
+        ),
+        SentinelZone(
+            name="Kunduz Province",            # River overflow + heavy rainfall
+            center=GeoPoint(latitude=36.7280, longitude=68.8570),
+            radius_km=18.0,
+            risk_level=SeverityLevel.HIGH,
+            population_density=18000,
+            elevation=400.0,
+            drainage_capacity="moderate"
+        ),
+        SentinelZone(
+            name="Oahu Island",                # Flash flood risk due to heavy storms
+            center=GeoPoint(latitude=21.4389, longitude=-158.0001),
+            radius_km=15.0,
+            risk_level=SeverityLevel.HIGH,
+            population_density=22000,
+            elevation=10.0,
+            drainage_capacity="moderate"
+        ),
+        SentinelZone(
+            name="Maui Island",               # Saturated land, continued rainfall risk
+            center=GeoPoint(latitude=20.7984, longitude=-156.3319),
+            radius_km=12.0,
+            risk_level=SeverityLevel.HIGH,
+            population_density=12000,
+            elevation=15.0,
+            drainage_capacity="moderate"
+        ),
+        SentinelZone(
+            name="Crete Island",              # Storm-induced flooding in Greece
+            center=GeoPoint(latitude=35.2401, longitude=24.8093),
+            radius_km=20.0,
+            risk_level=SeverityLevel.MEDIUM,
+            population_density=8000,
+            elevation=50.0,
+            drainage_capacity="moderate"
+        ),
+        SentinelZone(
+            name="Cyclades Region",           # Aegean islands flooding events
+            center=GeoPoint(latitude=37.0833, longitude=25.1500),
+            radius_km=18.0,
+            risk_level=SeverityLevel.MEDIUM,
+            population_density=7000,
+            elevation=40.0,
+            drainage_capacity="moderate"
+        ),
+        SentinelZone(
+            name="Nairobi",                   # Urban flooding, poor drainage
+            center=GeoPoint(latitude=-1.2921, longitude=36.8219),
+            radius_km=10.0,
+            risk_level=SeverityLevel.HIGH,
+            population_density=30000,
+            elevation=1700.0,
+            drainage_capacity="poor"
+        ),
+        SentinelZone(
+            name="Muscat",                    # Flash floods from heavy rain
+            center=GeoPoint(latitude=23.5880, longitude=58.3829),
+            radius_km=10.0,
+            risk_level=SeverityLevel.HIGH,
+            population_density=25000,
+            elevation=20.0,
+            drainage_capacity="poor"
+        ),
+        SentinelZone(
+            name="Rio Grande do Sul",         # Large-scale flood disaster (Brazil)
+            center=GeoPoint(latitude=-30.0346, longitude=-51.2177),
+            radius_km=30.0,
+            risk_level=SeverityLevel.CRITICAL,
+            population_density=20000,
+            elevation=10.0,
+            drainage_capacity="poor"
+        )
 
 
         ]

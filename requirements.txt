@@ -1,6 +1,10 @@
 
 
-
+folium 
+streamlit-folium 
+streamlit-autorefresh 
+plotly 
+pandas
 SQLAlchemy
 alembic
 
