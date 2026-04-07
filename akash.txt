@@ -10,4 +10,4 @@ ami valo acii
 
 
 
-
+new WebSocket("ws://localhost:8005/ws")

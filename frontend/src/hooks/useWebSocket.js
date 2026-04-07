@@ -32,11 +32,22 @@ export default function useWebSocket(url) {
 
     ws.onmessage = (e) => {
       try {
-        const msg = JSON.parse(e.data)
+        const raw = JSON.parse(e.data)
+
+        // 🔥 Normalize backend → frontend format
+        const normalized = {
+          type: raw.type || raw.event || raw.channel || 'UNKNOWN',
+          payload: raw.payload || raw.data || {},
+          timestamp: raw.timestamp || new Date().toISOString(),
+          channel: raw.channel || 'system'
+        }
+
         setEvents(prev => {
-          const next = [...prev, msg]
+          const next = [...prev, normalized]
+          if (normalized.channel === 'system') return prev
           return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next
         })
+
       } catch {
         // ignore malformed messages
       }

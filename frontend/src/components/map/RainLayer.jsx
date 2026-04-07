@@ -31,19 +31,24 @@ export default function RainLayer({ active }) {
 
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
+
       drops.forEach(d => {
         ctx.beginPath()
-        ctx.strokeStyle = `rgba(120,180,255,${d.opacity})`
+        ctx.strokeStyle = `rgba(160, 210, 255, ${d.opacity})`
         ctx.lineWidth = 1
         ctx.moveTo(d.x, d.y)
-        ctx.lineTo(d.x - 1, d.y + d.len)
+        ctx.lineTo(d.x - 3, d.y + d.len)
         ctx.stroke()
+
         d.y += d.speed
-        if (d.y > canvas.height) {
+        d.x -= 0.6
+
+        if (d.y > canvas.height || d.x < -20) {
           d.y = -d.len
           d.x = Math.random() * canvas.width
         }
       })
+
       rafRef.current = requestAnimationFrame(draw)
     }
     draw()

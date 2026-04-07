@@ -14,6 +14,7 @@ Shape contracts match exactly what each panel component expects.
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+import json
 
 import asyncpg
 from fastapi import APIRouter, Depends
@@ -24,6 +25,32 @@ logger = logging.getLogger("dashboard.routers.kpi")
 
 router = APIRouter(tags=["kpi"])
 
+
+def _as_dict(value):
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+def _as_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else [value]
+        except json.JSONDecodeError:
+            return [value]
+    return [value]
 
 # ── GET /api/kpi ──────────────────────────────────────────────────────────────
 
@@ -138,7 +165,8 @@ async def get_agent1(conn: asyncpg.Connection = Depends(get_db)) -> Dict[str, An
                 "trend": "stable", "risk_factors": [], "evidence_refs": [],
                 "weather": {}, "scores": {}}
 
-    rf = pred["risk_factors"] or {}
+    rf = _as_dict(pred["risk_factors"])
+    recommended_actions = _as_list(pred["recommended_actions"])
     risk = float(pred["risk_score"] or 0)
 
     # Map risk_factors dict to named scores for the 9-bar display
@@ -165,7 +193,7 @@ async def get_agent1(conn: asyncpg.Connection = Depends(get_db)) -> Dict[str, An
         "confidence":    float(pred["confidence"] or 0),
         "trend":         "rising" if risk >= 0.5 else "stable",
         "zone_name":     pred["zone_name"],
-        "risk_factors":  pred["recommended_actions"] or [],
+        "risk_factors": recommended_actions,       
         "evidence_refs": [f"Zone: {pred['zone_name']}", f"Risk score: {risk:.2f}"],
         "weather": {
             "rainfall_mm":     float(w.get("precipitation_1h") or w.get("precipitation_24h") or 0),
