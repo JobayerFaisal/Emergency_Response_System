@@ -1,3 +1,5 @@
+# backend/src/agents/agent_3_resource/main.py
+
 """
 src/agents/agent_3_resource/main.py
 Agent 3 — Resource Management FastAPI service.

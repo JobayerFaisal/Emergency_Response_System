@@ -1,3 +1,5 @@
+# backend/src/agents/agent_2_distress/models.py
+
 """
 src/agents/agent_2_distress/models.py
 All Pydantic models for Agent 2 — Distress Intelligence.

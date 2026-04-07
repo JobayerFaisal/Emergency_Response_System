@@ -1,3 +1,5 @@
+# backend/shared/location_resolver.py
+
 """
 shared/location_resolver.py
 

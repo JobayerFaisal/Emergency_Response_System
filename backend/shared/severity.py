@@ -1,3 +1,5 @@
+# backend/shared/severity.py
+
 """
 shared/severity.py
 Re-exports of core enums and models originally defined in Agent 1.

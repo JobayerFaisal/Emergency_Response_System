@@ -1,3 +1,5 @@
+# backend/src/agents/agent_3_resource/redis_handler.py
+
 """
 src/agents/agent_3_resource/redis_handler.py
 Subscribe/publish helpers for Agent 3.

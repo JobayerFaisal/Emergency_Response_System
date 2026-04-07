@@ -1,3 +1,5 @@
+# backend/src/agents/agent_2_distress/main.py
+
 """
 src/agents/agent_2_distress/main.py
 Agent 2 — Distress Intelligence FastAPI service.

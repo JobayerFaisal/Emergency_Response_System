@@ -1,3 +1,5 @@
+# backend/src/agents/agent_3_resource/inventory_manager.py
+
 """
 src/agents/agent_3_resource/inventory_manager.py
 Database CRUD for resource_units, inventory_transactions, resource_allocations.

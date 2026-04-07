@@ -1,8 +1,16 @@
-
 # ============================================================
 # Emergency Response System — Full Docker Compose
-# Runs: PostgreSQL+PostGIS, Redis, Agent 1, 2, 3, 4, Streamlit
-# Usage: docker-compose up --build
+# Usage:  docker-compose up --build
+#
+# Services:
+#   postgres        — PostGIS database
+#   redis           — pub/sub + cache
+#   agent1          — Environmental Intelligence  (8001)
+#   agent2          — Distress Intelligence       (8002)
+#   agent3          — Resource Management         (8003)
+#   agent4          — Dispatch Optimization       (8004)
+#   dashboard_api   — Dashboard FastAPI           (8005)
+#   frontend        — React + nginx               (3000)
 # ============================================================
 
 services:
@@ -13,15 +21,15 @@ services:
     image: postgis/postgis:15-3.3
     container_name: disaster_postgres
     environment:
-      POSTGRES_DB:                disaster_response
-      POSTGRES_USER:              postgres
-      POSTGRES_PASSWORD:          postgres
-      POSTGRES_HOST_AUTH_METHOD:  trust
+      POSTGRES_DB:               disaster_response
+      POSTGRES_USER:             postgres
+      POSTGRES_PASSWORD:         postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/database:/docker-entrypoint-initdb.d   # Auto-runs all .sql files on first start
+      - ./backend/database:/docker-entrypoint-initdb.d
     networks:
       - disaster_network
     healthcheck:
@@ -44,7 +52,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Agent 1: Environmental Intelligence ──────────────────
+  # ── Agent 1 ───────────────────────────────────────────────
+  # Context = project root so it can reach backend/models/ and
+  # mount ~/.config/earthengine from the host.
+  # PYTHONPATH = /app  →  "backend.src.agents..." resolves correctly.
 
   agent1:
     build:
@@ -52,28 +63,22 @@ services:
       dockerfile: backend/Dockerfile
     container_name: agent1_environmental
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
     environment:
-      DATABASE_URL:      postgresql://postgres:postgres@postgres:5432/disaster_response
+      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:         redis://redis:6379
-      PYTHONPATH:        /app
-      AGENT_PORT:        "8001"
-      FLOOD_MODEL_PATH:  /app/backend/models/flood_fast_best.keras
-      SAR_REF_START:     "2024-01-01"
-      SAR_REF_END:       "2024-04-06"
-    env_file:
-      - .env
+      REDIS_URL:          redis://redis:6379
+      PYTHONPATH:         /app
+      FLOOD_MODEL_PATH:   /app/backend/models/flood_fast_best.keras
+      SAR_REF_START:      "2024-01-01"
+      SAR_REF_END:        "2024-04-06"
+    env_file: [ .env ]
     ports:
       - "8001:8001"
     volumes:
       - .:/app
-      - ./backend/models:/app/backend/models
-      - ./backend/config:/app/backend/config        # ← ADD THIS
-      - ~/.config/earthengine:/root/.config/earthengine  # Mount Earth Engine credentials
+      - ~/.config/earthengine:/root/.config/earthengine
     networks:
       - disaster_network
     command: >
@@ -81,7 +86,9 @@ services:
       --host 0.0.0.0 --port 8001
     restart: unless-stopped
 
-  # ── Agent 2: Distress Intelligence ───────────────────────
+  # ── Agent 2 ───────────────────────────────────────────────
+  # Context = ./backend  →  mounted to /app
+  # PYTHONPATH = /app/backend  →  "src.*" and "shared.*" resolve
 
   agent2:
     build:
@@ -89,20 +96,15 @@ services:
       dockerfile: Dockerfile
     container_name: agent2_distress
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      agent1:
-        condition: service_started
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+      agent1:   { condition: service_started }
     environment:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
       PYTHONPATH:         /app/backend
-      AGENT_PORT:         "8002"
-    env_file:
-      - .env
+    env_file: [ .env ]
     ports:
       - "8002:8002"
     volumes:
@@ -114,7 +116,7 @@ services:
       --host 0.0.0.0 --port 8002
     restart: unless-stopped
 
-  # ── Agent 3: Resource Management ─────────────────────────
+  # ── Agent 3 ───────────────────────────────────────────────
 
   agent3:
     build:
@@ -122,18 +124,14 @@ services:
       dockerfile: Dockerfile
     container_name: agent3_resource
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
     environment:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
       PYTHONPATH:         /app/backend
-      AGENT_PORT:         "8003"
-    env_file:
-      - .env
+    env_file: [ .env ]
     ports:
       - "8003:8003"
     volumes:
@@ -145,7 +143,7 @@ services:
       --host 0.0.0.0 --port 8003
     restart: unless-stopped
 
-  # ── Agent 4: Dispatch Optimization ───────────────────────
+  # ── Agent 4 ───────────────────────────────────────────────
 
   agent4:
     build:
@@ -153,21 +151,16 @@ services:
       dockerfile: Dockerfile
     container_name: agent4_dispatch
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      agent3:
-        condition: service_started
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+      agent3:   { condition: service_started }
     environment:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
       OSRM_URL:           http://router.project-osrm.org
       PYTHONPATH:         /app/backend
-      AGENT_PORT:         "8004"
-    env_file:
-      - .env
+    env_file: [ .env ]
     ports:
       - "8004:8004"
     volumes:
@@ -179,38 +172,56 @@ services:
       --host 0.0.0.0 --port 8004
     restart: unless-stopped
 
-  frontend:
-      build: ./frontend
-      ports:
-        - "3000:3000"
-      networks:
-        - disaster_network          # ← ADD: must be on same network as dashboard_api
-      depends_on:
-        - dashboard_api             # ← ADD: wait for dashboard_api to start
+  # ── Dashboard API ─────────────────────────────────────────
+  # Context = project root (same Dockerfile as agent1).
+  # PYTHONPATH = /app/backend  →  "app.*" resolves to backend/app/
+  # The volume mounts the whole project to /app so both
+  # "from app.services..." and agent imports all work.
 
   dashboard_api:
     build:
-      context: .          # ← whole repo, not just ./backend
+      context: .
       dockerfile: backend/Dockerfile
-    command: uvicorn backend.src.agents.agent_1_environmental.main:app --host 0.0.0.0 --port 8005
-    ports:
-      - "8005:8005"
+    container_name: dashboard_api
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
     environment:
       DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
       DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
       REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app        # ← matches agent1
-    env_file:
-      - .env
+      PYTHONPATH:         /app/backend
+      AGENT1_URL:         http://agent1_environmental:8001
+      AGENT2_URL:         http://agent2_distress:8002
+      AGENT3_URL:         http://agent3_resource:8003
+      AGENT4_URL:         http://agent4_dispatch:8004
+      CORS_ORIGINS:       "http://localhost:3000,http://frontend:3000,http://disaster_frontend:3000"
+    env_file: [ .env ]
+    ports:
+      - "8005:8005"
     volumes:
-      - .:/app            # ← whole repo, not just backend
+      - .:/app
     networks:
       - disaster_network
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0 --port 8005
+    restart: unless-stopped
+
+  # ── Frontend ──────────────────────────────────────────────
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: disaster_frontend
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - dashboard_api
+    ports:
+      - "3000:3000"
+    networks:
+      - disaster_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
@@ -218,7 +229,6 @@ volumes:
 networks:
   disaster_network:
     driver: bridge
-
 
 
     

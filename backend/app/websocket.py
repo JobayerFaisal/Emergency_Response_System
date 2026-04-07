@@ -1,3 +1,5 @@
+#backend/app/websocket.py
+
 """
 backend/app/websocket.py
 =========================
@@ -28,7 +30,7 @@ import logging
 from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
 
-from app.services.redis_bridge import manager
+from .services.redis_bridge import manager
 
 logger = logging.getLogger("dashboard.websocket")
 

@@ -1,3 +1,5 @@
+# backend/app/main.py
+
 """
 backend/app/main.py
 ====================
@@ -25,10 +27,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.services.db import init_db, close_db
-from app.services.redis_bridge import init_redis, close_redis, start_bridge, stop_bridge
-from app.routers import dashboard, zones, predictions, distress, resources, dispatch
-from app.websocket import router as ws_router
+from .services.db import init_db, close_db
+from .services.redis_bridge import init_redis, close_redis, start_bridge, stop_bridge
+from .routers import dashboard, zones, predictions, distress, resources, dispatch
+from .routers import kpi as kpi_router
+from .websocket import router as ws_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +54,28 @@ async def lifespan(app: FastAPI):
     await init_db()
     await init_redis()
     await start_bridge()
+
+    # ── DEBUG: verify data is in DB on startup ──────────────
+    try:
+        from app.services.db import get_pool
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            zones     = await conn.fetchval("SELECT COUNT(*) FROM sentinel_zones")
+            preds     = await conn.fetchval("SELECT COUNT(*) FROM flood_predictions")
+            allocs    = await conn.fetchval("SELECT COUNT(*) FROM resource_allocations")
+            resources = await conn.fetchval("SELECT COUNT(*) FROM resource_units")
+            messages  = await conn.fetchval("SELECT COUNT(*) FROM agent_messages")
+
+            logger.info("━" * 50)
+            logger.info("📊 DATABASE SNAPSHOT ON STARTUP:")
+            logger.info("   sentinel_zones      : %d rows", zones)
+            logger.info("   flood_predictions   : %d rows", preds)
+            logger.info("   resource_allocations: %d rows", allocs)
+            logger.info("   resource_units      : %d rows", resources)
+            logger.info("   agent_messages      : %d rows", messages)
+            logger.info("━" * 50)
+    except Exception as e:
+        logger.error("❌ DB snapshot failed: %s", e)
 
     logger.info("✅ Dashboard API ready on port 8005")
     logger.info("   Routers : /api/dashboard | /api/zones | /api/predictions")
@@ -99,6 +124,7 @@ def create_app() -> FastAPI:
     )
 
     # ── Routers ───────────────────────────────────────────────────────────
+    app.include_router(kpi_router.router)
     app.include_router(dashboard.router)
     app.include_router(zones.router)
     app.include_router(predictions.router)
@@ -115,7 +141,9 @@ def create_app() -> FastAPI:
             "version":  "1.0.0",
             "status":   "operational",
             "endpoints": {
-                "dashboard":   "/api/dashboard",
+                "kpi":         "/api/kpi",
+            "agents":       "/api/agents/{agent1|agent2|agent3|agent4}",
+            "dashboard":   "/api/dashboard",
                 "zones":       "/api/zones",
                 "predictions": "/api/predictions",
                 "distress":    "/api/distress",

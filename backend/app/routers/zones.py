@@ -14,6 +14,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.db import get_db
 
 logger = logging.getLogger("dashboard.routers.zones")
+import math
+
+
+def _make_circle(lat: float, lon: float, radius_km: float, steps: int = 32) -> dict:
+    """Approximate a circle as a GeoJSON Polygon around a lat/lon center."""
+    coords = []
+    for i in range(steps + 1):
+        angle = math.radians(i * 360 / steps)
+        dlat = (radius_km / 111.0) * math.cos(angle)
+        dlon = (radius_km / (111.0 * math.cos(math.radians(lat)))) * math.sin(angle)
+        coords.append([lon + dlon, lat + dlat])
+    return {"type": "Polygon", "coordinates": [coords]}
 
 router = APIRouter(prefix="/api/zones", tags=["zones"])
 
@@ -114,9 +126,36 @@ async def list_zones(
             "properties": props,
         })
 
+    # Build flood GeoJSON — use circle approximation around each zone center
+    # River GeoJSON — stub (real river lines would come from a rivers table)
+    flood_geojson = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": _make_circle(
+                    float(f["geometry"]["coordinates"][1]),
+                    float(f["geometry"]["coordinates"][0]),
+                    float(f["properties"].get("radius_km", 5))
+                ),
+                "properties": {
+                    **f["properties"],
+                    "risk": f["properties"].get("risk_score", 0),
+                }
+            }
+            for f in features
+        ]
+    }
+
+    rivers_geojson = {
+        "type": "FeatureCollection",
+        "features": []   # populated by Agent1 river data in future
+    }
+
     return {
-        "type":     "FeatureCollection",
-        "features": features,
+        "flood":    flood_geojson,
+        "rivers":   rivers_geojson,
+        "points":   {"type": "FeatureCollection", "features": features},
         "count":    len(features),
     }
 

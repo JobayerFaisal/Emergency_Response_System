@@ -1,3 +1,5 @@
+# backend/src/agents/agent_3_resource/models.py
+
 """
 src/agents/agent_3_resource/models.py
 All Pydantic models for Agent 3 Resource Management.

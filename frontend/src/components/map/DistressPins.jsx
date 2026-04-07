@@ -1,3 +1,6 @@
+// frontend/src/components/map/DistressPins.jsx
+
+
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 

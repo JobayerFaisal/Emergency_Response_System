@@ -1,3 +1,5 @@
+# backend/shared/message_protocol.py
+
 """
 shared/message_protocol.py
 Standard Redis message envelope used by ALL agents.

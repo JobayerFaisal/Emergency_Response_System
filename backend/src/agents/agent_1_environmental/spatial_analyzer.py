@@ -1,3 +1,5 @@
+# backend/src/agents/agent_1_environmental/spatial_analyzer.py
+
 """
 Spatial Analyzer for Environmental Intelligence Agent
 =====================================================

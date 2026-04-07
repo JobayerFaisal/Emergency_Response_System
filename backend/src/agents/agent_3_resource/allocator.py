@@ -1,3 +1,5 @@
+# backend/src/agents/agent_3_resource/allocator.py
+
 """
 src/agents/agent_3_resource/allocator.py
 AI-powered resource allocation for Agent 3.

@@ -166,12 +166,18 @@ async def _listen_forever() -> None:
                 except json.JSONDecodeError:
                     payload = {"raw": data}
 
-                # Wrap with channel metadata so the frontend knows what it is
+                # Wrap in the format useWebSocket.js expects:
+                # { type, payload, timestamp }
+                # Also include channel/event for backwards compatibility
                 envelope = json.dumps(
                     {
-                        "channel": channel,
-                        "event": channel,          # alias for frontend switch
-                        "data": payload,
+                        "type":      channel,         # maps to EVENT_ICON keys in AgentFeed
+                        "channel":   channel,
+                        "event":     channel,
+                        "payload":   payload,
+                        "data":      payload,         # legacy alias
+                        "timestamp": payload.get("timestamp") if isinstance(payload, dict)
+                                     else None,
                     }
                 )
 

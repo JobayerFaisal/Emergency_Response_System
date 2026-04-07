@@ -1,3 +1,5 @@
+# backend/src/agents/agent_3_resource/ai_allocator.py
+
 """
 src/agents/agent_3_resource/ai_allocator.py
 AI-powered allocation decision engine using OpenAI GPT-4o.

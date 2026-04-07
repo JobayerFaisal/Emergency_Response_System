@@ -471,7 +471,7 @@ class EnvironmentalIntelligenceAgent:
             name="Crete Island",              # Storm-induced flooding in Greece
             center=GeoPoint(latitude=35.2401, longitude=24.8093),
             radius_km=20.0,
-            risk_level=SeverityLevel.MEDIUM,
+            risk_level=SeverityLevel.MODERATE,
             population_density=8000,
             elevation=50.0,
             drainage_capacity="moderate"
@@ -480,7 +480,7 @@ class EnvironmentalIntelligenceAgent:
             name="Cyclades Region",           # Aegean islands flooding events
             center=GeoPoint(latitude=37.0833, longitude=25.1500),
             radius_km=18.0,
-            risk_level=SeverityLevel.MEDIUM,
+            risk_level=SeverityLevel.MODERATE,
             population_density=7000,
             elevation=40.0,
             drainage_capacity="moderate"
