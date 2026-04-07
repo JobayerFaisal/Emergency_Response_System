@@ -200,6 +200,17 @@ export default function MainMap({ zones, activeLayers, agents, events }) {
     }
   }, [])
 
+  const avgRisk = useMemo(() => {
+    const features = floodGeoJSON?.features || []
+    if (!features.length) return 0
+
+    const total = features.reduce((sum, f) => {
+      return sum + (f.properties?.risk || 0)
+    }, 0)
+
+    return total / features.length
+  }, [floodGeoJSON])  
+
   return (
     <div className="main-map-wrapper" style={{ position: 'relative' }}>
       <div ref={mapContainer} className="map-container" />

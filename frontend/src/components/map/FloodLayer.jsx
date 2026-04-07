@@ -27,7 +27,7 @@ export default function FloodLayer({ map, geojson, visible }) {
           paint: {
             'fill-color': [
               'interpolate', ['linear'],
-              ['coalesce', ['to-number', ['get', 'risk']], 0],
+              ['coalesce', ['to-number', ['*', ['get', 'risk'], 2.5]], 0],
               0.00, 'rgba(0,0,0,0)',
               0.15, '#0f3b82',
               0.35, '#155eef',
@@ -37,7 +37,7 @@ export default function FloodLayer({ map, geojson, visible }) {
             ],
             'fill-opacity': [
               'interpolate', ['linear'],
-              ['coalesce', ['to-number', ['get', 'risk']], 0],
+              ['coalesce', ['to-number', ['*', ['get', 'risk'], 2.5]], 0],
               0.00, 0.00,
               0.20, 0.10,
               0.40, 0.16,
@@ -58,7 +58,7 @@ export default function FloodLayer({ map, geojson, visible }) {
             'fill-color': '#7dd3fc',
             'fill-opacity': [
               'interpolate', ['linear'],
-              ['coalesce', ['to-number', ['get', 'risk']], 0],
+              ['coalesce', ['to-number', ['*', ['get', 'risk'], 2.5]], 0],
               0.00, 0.00,
               0.60, 0.00,
               0.80, 0.10,
