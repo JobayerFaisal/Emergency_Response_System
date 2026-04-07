@@ -1,0 +1,178 @@
+# backend/app/routers/dashboard.py
+from app.services.db import get_db
+
+# backend/app/routers/dispatch.py
+from app.services.db import get_db
+from app.services.redis_bridge import publish
+
+# backend/app/routers/distress.py
+from app.services.db import get_db
+from app.services.redis_bridge import publish
+
+# backend/app/routers/predictions.py
+from app.services.db import get_db
+
+# backend/app/routers/resources.py
+from app.services.db import get_db
+
+# backend/app/routers/zones.py
+from app.services.db import get_db
+
+# backend/app/services/db.py
+# backend/app/services/redis_bridge.py
+
+# backend/app/main.py
+from .services.db import init_db, close_db
+from .services.redis_bridge import init_redis, close_redis, start_bridge, stop_bridge
+from .routers import dashboard, zones, predictions, distress, resources, dispatch
+from .websocket import router as ws_router
+
+#backend/app/websocket.py
+from .services.redis_bridge import manager
+
+
+# backend/src/agents/agent_1_environmental/data_collectors.py
+from backend.src.agents.agent_1_environmental.models import (
+    WeatherData, WeatherMetrics, PrecipitationData, WeatherCondition,
+    SocialMediaPost, GeoPoint, SentinelZone, DataSource, BoundingBox
+)
+from backend.src.agents.agent_1_environmental.services.satellite_service import SatelliteDataCollector, SatelliteData
+
+
+# backend/src/agents/agent_1_environmental/data_processors.py
+from backend.src.agents.agent_1_environmental.models import (
+    WeatherData, SocialMediaPost, EnrichedSocialPost,
+    PrecipitationData, WeatherCondition, SeverityLevel
+)
+
+
+# backend/src/agents/agent_1_environmental/main.py
+from backend.src.agents.agent_1_environmental.models import (
+    AgentOutput, SentinelZone, GeoPoint, SeverityLevel,
+    HealthCheckResponse, MonitoringStatus, WeatherData
+)
+from backend.src.agents.agent_1_environmental.data_collectors import (
+    WeatherAPICollector,
+    SocialMediaCollector,
+    DataCollectionOrchestrator,
+    RiverLevelCollector
+)
+from backend.src.agents.agent_1_environmental.services.satellite_service import SatelliteDataCollector
+from backend.src.agents.agent_1_environmental.data_processors import (
+    LLMEnrichmentProcessor,
+    WeatherDataNormalizer,
+    SocialMediaAnalyzer,
+    DataProcessingOrchestrator
+)
+from backend.src.agents.agent_1_environmental.spatial_analyzer import PostGISSpatialAnalyzer
+from backend.src.agents.agent_1_environmental.predictor import (
+    FloodRiskPredictor,
+    AlertGenerator,
+    PredictionOrchestrator
+)
+
+# backend/src/agents/agent_1_environmental/models.py
+
+
+# backend/src/agents/agent_1_environmental/predictor.py
+from backend.src.agents.agent_1_environmental.models import (
+    FloodPrediction, FloodRiskFactors, SentinelZone,
+    SeverityLevel, AlertType, EnvironmentalAlert,
+    WeatherData, EnrichedSocialPost, SpatialAnalysisResult
+)
+
+# backend/src/agents/agent_1_environmental/spatial_analyzer.py
+from backend.src.agents.agent_1_environmental.models import (
+    GeoPoint, BoundingBox, SentinelZone, EnrichedSocialPost,
+    WeatherData, SpatialAnalysisResult, SeverityLevel
+)
+
+
+# backend/src/agents/agent_2_distress/alert_processor.py
+from .models import (
+    FloodAlert, DistressIncident, UrgencyLevel, IncidentSource,
+    SEVERITY_TO_URGENCY, SEVERITY_TO_PRIORITY,
+)
+
+# backend/src/agents/agent_2_distress/main.py
+from shared.message_protocol import AgentMessage
+from .models import DistressIncident, FloodAlert, UrgencyLevel
+from .alert_processor import AlertProcessor
+from .redis_handler import publish_message, listen_flood_alerts
+
+# backend/src/agents/agent_2_distress/models.py
+
+# backend/src/agents/agent_2_distress/redis_handler.py
+from shared.message_protocol import AgentMessage
+
+# backend/src/agents/agent_3_resource/ai_allocator.py
+from shared.geo_utils import haversine_km
+from .models import ResourceType, ALLOCATION_RULES
+
+# backend/src/agents/agent_3_resource/allocator.py
+from shared.geo_utils import haversine_km
+from shared.location_resolver import resolver as location_resolver
+from .models import ResourceType, ResourceAllocation
+from .ai_allocator import AIDecisionEngine
+
+
+# backend/src/agents/agent_3_resource/inventory_manager.py
+from shared.geo_utils import haversine_km, postgis_point_wkt
+from .models import ResourceUnit, ResourceType, ResourceStatus, ResourceAllocation
+
+
+# backend/src/agents/agent_3_resource/main.py
+from shared.message_protocol import AgentMessage
+from src.agents.agent_3_resource.models import ResourceType, RestockRequest, InventorySnapshot
+from src.agents.agent_3_resource.inventory_manager import InventoryManager
+from .allocator import ResourceAllocator
+from .redis_handler import publish_message, listen_distress_queue
+from .seed_data import seed_initial_resources
+
+# backend/src/agents/agent_3_resource/models.py
+from shared.severity import GeoPoint
+
+
+# backend/src/agents/agent_3_resource/redis_handler.py
+from shared.message_protocol import AgentMessage
+
+# backend/src/agents/agent_3_resource/seed_data.py
+from shared.geo_utils import postgis_point_wkt
+
+# backend/src/agents/agent_4_dispatch/ai_router.py
+
+# backend/src/agents/agent_4_dispatch/dispatch_manager.py
+from shared.geo_utils import postgis_point_wkt
+from .models import RouteAssignment, TeamAssignment, TeamStatus
+
+# backend/src/agents/agent_4_dispatch/main.py
+from shared.message_protocol import AgentMessage
+from shared.severity import GeoPoint
+from .models import (
+    RouteAssignment, TeamAssignment,
+    TeamStatusUpdate, TeamStatus, TransportMode,
+)
+from .route_computer import RouteComputer
+from .safety_checker import RouteSafetyChecker
+from .dispatch_manager import DispatchManager
+from .redis_handler import publish_message, listen_dispatch_order
+from .ai_router import AIRoutingAdvisor
+
+# backend/src/agents/agent_4_dispatch/models.py
+from shared.severity import GeoPoint
+
+# backend/src/agents/agent_4_dispatch/redis_handler.py
+from shared.message_protocol import AgentMessage
+from shared.severity import GeoPoint
+from shared.geo_utils import haversine_km, straight_line_geojson
+from .models import TransportMode, BOAT_SPEEDS, ROAD_SPEED_FALLBACK_KMH
+
+# backend/src/agents/agent_4_dispatch/safety_checker.py
+
+# backend/shared/severity.py
+# backend/shared/message_protocol.py
+# backend/shared/location_resolver.py
+# backend/shared/geo_utils.py
+
+
+
