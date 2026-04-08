@@ -15,18 +15,18 @@ from shared.severity import GeoPoint
 
 
 class ResourceType(str, Enum):
-    RESCUE_BOAT   = "rescue_boat"
-    MEDICAL_TEAM  = "medical_team"
-    MEDICAL_KIT   = "medical_kit"
-    FOOD_SUPPLY   = "food_supply"
-    WATER_SUPPLY  = "water_supply"
+    RESCUE_BOAT = "rescue_boat"
+    MEDICAL_TEAM = "medical_team"
+    MEDICAL_KIT = "medical_kit"
+    FOOD_SUPPLY = "food_supply"
+    WATER_SUPPLY = "water_supply"
 
 
 class ResourceStatus(str, Enum):
-    AVAILABLE    = "available"
-    DEPLOYED     = "deployed"
-    RETURNING    = "returning"
-    MAINTENANCE  = "maintenance"
+    AVAILABLE = "available"
+    DEPLOYED = "deployed"
+    RETURNING = "returning"
+    MAINTENANCE = "maintenance"
 
 
 class ResourceUnit(BaseModel):
@@ -44,11 +44,10 @@ class ResourceUnit(BaseModel):
 
 class InventorySnapshot(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    resources: Dict[str, dict]   # {resource_type: {total, available, deployed}}
+    resources: Dict[str, dict]
 
 
 class ResourceAllocation(BaseModel):
-    """What Agent 3 sends to Agent 4 via dispatch_order channel."""
     allocation_id: UUID = Field(default_factory=uuid4)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     incident_id: str
@@ -58,7 +57,7 @@ class ResourceAllocation(BaseModel):
     priority: int
     urgency: str
     num_people_affected: int
-    allocated_resources: List[dict]   # [{unit_id, type, name, current_location}]
+    allocated_resources: List[dict]
     requires_medical: bool
     partial_allocation: bool = False
     notes: str = ""
@@ -71,34 +70,33 @@ class RestockRequest(BaseModel):
     notes: Optional[str] = None
 
 
-# ── Allocation rules per urgency level ────────────────────────────────────────
 ALLOCATION_RULES = {
     "LIFE_THREATENING": {
-        ResourceType.RESCUE_BOAT:  2,
+        ResourceType.RESCUE_BOAT: 2,
         ResourceType.MEDICAL_TEAM: 1,
-        ResourceType.MEDICAL_KIT:  2,
-        ResourceType.FOOD_SUPPLY:  0,
+        ResourceType.MEDICAL_KIT: 2,
+        ResourceType.FOOD_SUPPLY: 0,
         ResourceType.WATER_SUPPLY: 0,
     },
     "URGENT_MEDICAL": {
-        ResourceType.RESCUE_BOAT:  1,
+        ResourceType.RESCUE_BOAT: 1,
         ResourceType.MEDICAL_TEAM: 1,
-        ResourceType.MEDICAL_KIT:  1,
-        ResourceType.FOOD_SUPPLY:  0,
+        ResourceType.MEDICAL_KIT: 1,
+        ResourceType.FOOD_SUPPLY: 0,
         ResourceType.WATER_SUPPLY: 0,
     },
     "URGENT": {
-        ResourceType.RESCUE_BOAT:  1,
+        ResourceType.RESCUE_BOAT: 1,
         ResourceType.MEDICAL_TEAM: 0,
-        ResourceType.MEDICAL_KIT:  0,
-        ResourceType.FOOD_SUPPLY:  1,
+        ResourceType.MEDICAL_KIT: 0,
+        ResourceType.FOOD_SUPPLY: 1,
         ResourceType.WATER_SUPPLY: 1,
     },
     "MODERATE": {
-        ResourceType.RESCUE_BOAT:  0,
+        ResourceType.RESCUE_BOAT: 0,
         ResourceType.MEDICAL_TEAM: 0,
-        ResourceType.MEDICAL_KIT:  0,
-        ResourceType.FOOD_SUPPLY:  1,
+        ResourceType.MEDICAL_KIT: 0,
+        ResourceType.FOOD_SUPPLY: 1,
         ResourceType.WATER_SUPPLY: 1,
     },
 }

@@ -14,6 +14,28 @@ const STATUS_COLOR = {
   FAILED: '#ef4444',
 }
 
+function hasStyle(map) {
+  return !!map && !!map.style
+}
+
+function safeGetLayer(map, id) {
+  if (!hasStyle(map)) return null
+  try {
+    return map.getLayer(id)
+  } catch {
+    return null
+  }
+}
+
+function safeGetSource(map, id) {
+  if (!hasStyle(map)) return null
+  try {
+    return map.getSource(id)
+  } catch {
+    return null
+  }
+}
+
 function buildFeatureCollection(routes) {
   return {
     type: 'FeatureCollection',
@@ -36,7 +58,6 @@ function buildFeatureCollection(routes) {
 
 export default function RouteMap({ map, routes = [], visible }) {
   const animFrameRef = useRef(null)
-  const dashPhaseRef = useRef(0)
 
   const featureCollection = useMemo(
     () => buildFeatureCollection(routes),
@@ -47,14 +68,14 @@ export default function RouteMap({ map, routes = [], visible }) {
     if (!map) return
 
     const onLoad = () => {
-      if (!map.getSource(SOURCE_ID)) {
+      if (!safeGetSource(map, SOURCE_ID)) {
         map.addSource(SOURCE_ID, {
           type: 'geojson',
           data: featureCollection,
         })
       }
 
-      if (!map.getLayer(LAYER_BG)) {
+      if (!safeGetLayer(map, LAYER_BG)) {
         map.addLayer({
           id: LAYER_BG,
           type: 'line',
@@ -72,7 +93,7 @@ export default function RouteMap({ map, routes = [], visible }) {
         })
       }
 
-      if (!map.getLayer(LAYER_LINE)) {
+      if (!safeGetLayer(map, LAYER_LINE)) {
         map.addLayer({
           id: LAYER_LINE,
           type: 'line',
@@ -101,7 +122,7 @@ export default function RouteMap({ map, routes = [], visible }) {
         })
       }
 
-      if (!map.getLayer(LAYER_DASH)) {
+      if (!safeGetLayer(map, LAYER_DASH)) {
         map.addLayer({
           id: LAYER_DASH,
           type: 'line',
@@ -128,7 +149,7 @@ export default function RouteMap({ map, routes = [], visible }) {
         })
       }
 
-      if (!map.getLayer(LAYER_ARROW)) {
+      if (!safeGetLayer(map, LAYER_ARROW)) {
         map.addLayer({
           id: LAYER_ARROW,
           type: 'symbol',
@@ -152,16 +173,17 @@ export default function RouteMap({ map, routes = [], visible }) {
         })
       }
 
+      let dashPhase = 0
       const animateDash = () => {
-        dashPhaseRef.current += 0.08
-        const phase = dashPhaseRef.current % 4
+        if (!hasStyle(map) || !safeGetLayer(map, LAYER_DASH)) return
 
-        if (map.getLayer(LAYER_DASH)) {
-          map.setPaintProperty(LAYER_DASH, 'line-dasharray', [
-            phase,
-            2,
-            3,
-          ])
+        dashPhase += 0.08
+        const phase = dashPhase % 4
+
+        try {
+          map.setPaintProperty(LAYER_DASH, 'line-dasharray', [phase, 2, 3])
+        } catch {
+          return
         }
 
         animFrameRef.current = requestAnimationFrame(animateDash)
@@ -170,7 +192,7 @@ export default function RouteMap({ map, routes = [], visible }) {
       animateDash()
     }
 
-    if (map.isStyleLoaded()) {
+    if (hasStyle(map) && map.isStyleLoaded()) {
       onLoad()
     } else {
       map.once('load', onLoad)
@@ -178,25 +200,41 @@ export default function RouteMap({ map, routes = [], visible }) {
 
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
-      if (map.getLayer(LAYER_ARROW)) map.removeLayer(LAYER_ARROW)
-      if (map.getLayer(LAYER_DASH)) map.removeLayer(LAYER_DASH)
-      if (map.getLayer(LAYER_LINE)) map.removeLayer(LAYER_LINE)
-      if (map.getLayer(LAYER_BG)) map.removeLayer(LAYER_BG)
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+      if (!hasStyle(map)) return
+
+      try {
+        if (safeGetLayer(map, LAYER_ARROW)) map.removeLayer(LAYER_ARROW)
+        if (safeGetLayer(map, LAYER_DASH)) map.removeLayer(LAYER_DASH)
+        if (safeGetLayer(map, LAYER_LINE)) map.removeLayer(LAYER_LINE)
+        if (safeGetLayer(map, LAYER_BG)) map.removeLayer(LAYER_BG)
+        if (safeGetSource(map, SOURCE_ID)) map.removeSource(SOURCE_ID)
+      } catch {
+        // map/style already torn down
+      }
     }
   }, [map])
 
   useEffect(() => {
-    if (!map || !map.getSource(SOURCE_ID)) return
-    map.getSource(SOURCE_ID).setData(featureCollection)
+    const source = safeGetSource(map, SOURCE_ID)
+    if (!source) return
+    try {
+      source.setData(featureCollection)
+    } catch {
+      // ignore during style teardown
+    }
   }, [map, featureCollection])
 
   useEffect(() => {
-    if (!map || !map.isStyleLoaded()) return
+    if (!hasStyle(map)) return
     const vis = visible ? 'visible' : 'none'
+
     ;[LAYER_BG, LAYER_LINE, LAYER_DASH, LAYER_ARROW].forEach((id) => {
-      if (map.getLayer(id)) {
-        map.setLayoutProperty(id, 'visibility', vis)
+      if (safeGetLayer(map, id)) {
+        try {
+          map.setLayoutProperty(id, 'visibility', vis)
+        } catch {
+          // ignore during style transitions
+        }
       }
     })
   }, [map, visible])

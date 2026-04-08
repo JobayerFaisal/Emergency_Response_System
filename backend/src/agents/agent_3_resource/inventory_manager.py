@@ -10,12 +10,11 @@ import json
 import logging
 from typing import List, Optional, Dict
 from uuid import UUID
-from datetime import datetime, timezone
 
 import asyncpg
 
-from shared.geo_utils import haversine_km, postgis_point_wkt
-from .models import ResourceUnit, ResourceType, ResourceStatus, ResourceAllocation
+from shared.geo_utils import postgis_point_wkt
+from .models import ResourceType, ResourceAllocation
 
 logger = logging.getLogger("agent3.inventory")
 
@@ -23,8 +22,6 @@ logger = logging.getLogger("agent3.inventory")
 class InventoryManager:
     def __init__(self, db_pool: asyncpg.Pool):
         self.pool = db_pool
-
-    # ── READ ──────────────────────────────────────────────────────────────
 
     async def get_all_units(self) -> List[dict]:
         async with self.pool.acquire() as conn:
@@ -40,9 +37,7 @@ class InventoryManager:
             """)
             return [dict(r) for r in rows]
 
-    async def get_available_units(
-        self, resource_type: ResourceType
-    ) -> List[dict]:
+    async def get_available_units(self, resource_type: ResourceType) -> List[dict]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch("""
                 SELECT id, resource_type, name, status, capacity,
@@ -68,10 +63,10 @@ class InventoryManager:
             """)
             return {
                 r["resource_type"]: {
-                    "total":       int(r["total"]),
-                    "available":   int(r["available"]),
-                    "deployed":    int(r["deployed"]),
-                    "returning":   int(r["returning"]),
+                    "total": int(r["total"]),
+                    "available": int(r["available"]),
+                    "deployed": int(r["deployed"]),
+                    "returning": int(r["returning"]),
                     "maintenance": int(r["maintenance"]),
                 }
                 for r in rows
@@ -96,14 +91,7 @@ class InventoryManager:
             """, allocation_id)
             return dict(row) if row else None
 
-    # ── WRITE ─────────────────────────────────────────────────────────────
-
-    async def mark_deployed(
-        self,
-        unit_id: UUID,
-        incident_id: str,
-        zone_id: str,
-    ) -> None:
+    async def mark_deployed(self, unit_id: UUID, incident_id: str, zone_id: str) -> None:
         async with self.pool.acquire() as conn:
             await conn.execute("""
                 UPDATE resource_units
@@ -136,7 +124,6 @@ class InventoryManager:
         lon: float,
         capacity: int = 10,
     ) -> List[UUID]:
-        """Insert new resource units (restock). Returns list of new UUIDs."""
         wkt = postgis_point_wkt(lat, lon)
         new_ids = []
         async with self.pool.acquire() as conn:
@@ -207,7 +194,6 @@ class InventoryManager:
                 """, resource_type.value, uid, direction, quantity,
                     triggered_by, incident_id, zone_id)
 
-    # Expose for allocator to call after marking deployed
     async def log_allocation_transaction(
         self, units: List[dict], incident_id: str, zone_id: str
     ) -> None:

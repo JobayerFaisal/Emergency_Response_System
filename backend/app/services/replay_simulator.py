@@ -1,3 +1,5 @@
+# backend/app/services/replay_simulator.py
+
 import asyncio
 import json
 import logging
@@ -16,12 +18,21 @@ class ReplaySimulator:
         self.scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
         self.scenario_date = os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z")
 
+        self.replay_mode_name = (
+            self.scenario_mode if self.scenario_mode.startswith("REPLAY") else "REPLAY_HISTORICAL"
+        )
+
+        self._mode_override: str | None = None
         self._redis: aioredis.Redis | None = None
         self._task: asyncio.Task | None = None
 
         self._running = False
         self._paused = False
         self._tick = 0
+
+        # Slower replay pacing to avoid UI blinking
+        self.step_interval_seconds = float(os.getenv("REPLAY_STEP_INTERVAL_SECONDS", "15"))
+        self.phase_gap_seconds = float(os.getenv("REPLAY_PHASE_GAP_SECONDS", "2"))
 
         self.zones = [
             {
@@ -87,38 +98,49 @@ class ReplaySimulator:
         ]
 
     @property
+    def current_mode(self) -> str:
+        return self._mode_override or self.scenario_mode
+
+    @property
     def enabled(self) -> bool:
-        return self.scenario_mode.startswith("REPLAY")
+        return self.current_mode.startswith("REPLAY")
 
     async def start(self) -> None:
         if not self.enabled:
-            logger.info("Replay simulator not started (mode=%s)", self.scenario_mode)
+            logger.info("Replay simulator not started (mode=%s)", self.current_mode)
             return
 
         if self._running:
             self._paused = False
+            logger.info("Replay simulator already running; resumed")
             return
 
-        self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
+        if self._redis is None:
+            self._redis = aioredis.from_url(self.redis_url, decode_responses=True)
+
         self._running = True
         self._paused = False
         self._task = asyncio.create_task(self._run())
-        logger.info("Replay simulator started for %s", self.scenario_mode)
+        logger.info(
+            "Replay simulator started for %s (step_interval=%ss)",
+            self.current_mode,
+            self.step_interval_seconds,
+        )
 
     async def stop(self) -> None:
         self._running = False
         self._paused = False
 
         if self._task:
-          self._task.cancel()
-          try:
-              await self._task
-          except asyncio.CancelledError:
-              pass
-          self._task = None
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
 
         if self._redis:
-            await self._redis.close()
+            await self._redis.aclose()
             self._redis = None
 
         logger.info("Replay simulator stopped")
@@ -130,6 +152,9 @@ class ReplaySimulator:
         logger.info("Replay simulator paused")
 
     async def resume(self) -> None:
+        if not self.enabled:
+            logger.info("Replay simulator resume ignored (mode=%s)", self.current_mode)
+            return
         if not self._running:
             await self.start()
             return
@@ -140,14 +165,29 @@ class ReplaySimulator:
         self._tick = 0
         logger.info("Replay simulator reset")
 
+    async def switch_to_live(self) -> None:
+        await self.stop()
+        self._mode_override = "LIVE"
+        logger.info("Switched replay simulator to LIVE mode")
+
+    async def switch_to_replay(self) -> None:
+        was_live = self.current_mode == "LIVE"
+        self._mode_override = self.replay_mode_name
+        if was_live:
+            self._tick = 0
+        await self.start()
+        logger.info("Switched replay simulator to %s mode", self.current_mode)
+
     def status(self) -> dict:
         return {
+            "mode": self.current_mode,
             "enabled": self.enabled,
             "running": self._running,
             "paused": self._paused,
             "tick": self._tick,
-            "scenario_mode": self.scenario_mode,
+            "scenario_mode": self.current_mode,
             "scenario_date": self.scenario_date,
+            "step_interval_seconds": self.step_interval_seconds,
         }
 
     async def _publish(self, channel: str, payload: dict) -> None:
@@ -249,24 +289,24 @@ class ReplaySimulator:
                 self._tick += 1
 
                 await self._emit_team_statuses()
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(self.phase_gap_seconds)
 
-                if self._paused:
+                if self._paused or not self._running:
                     continue
 
                 await self._emit_distress_event()
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(self.phase_gap_seconds)
 
-                if self._paused:
+                if self._paused or not self._running:
                     continue
 
                 await self._emit_route_assignment()
-                await asyncio.sleep(1.0)
 
-                if self._tick % 2 == 0 and not self._paused:
+                if self._tick % 2 == 0 and not self._paused and self._running:
+                    await asyncio.sleep(self.phase_gap_seconds)
                     await self._emit_inventory_update()
 
-                await asyncio.sleep(4.0)
+                await asyncio.sleep(self.step_interval_seconds)
 
             except asyncio.CancelledError:
                 raise

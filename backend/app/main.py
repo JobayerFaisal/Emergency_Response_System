@@ -1,4 +1,5 @@
 # backend/app/main.py
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from .services.replay_simulator import ReplaySimulator
 from .routers import dashboard, zones, predictions, distress, resources, dispatch
 from .routers import kpi as kpi_router
 from .websocket import router as ws_router
+from .config.scenario import set_mode
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,19 +30,16 @@ async def lifespan(app: FastAPI):
     logger.info("  Emergency Response System — Dashboard API  v1.0.0")
     logger.info("═" * 60)
 
-    scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
-    scenario_date = os.getenv("SCENARIO_DATE", "")
-
     await init_db()
     await init_redis()
     await start_bridge()
 
     app.state.replay_simulator = replay_simulator
 
-    if scenario_mode.startswith("REPLAY"):
-        logger.warning("⏪ Replay mode active: %s", scenario_mode)
-        if scenario_date:
-            logger.warning("⏪ Replay scenario timestamp: %s", scenario_date)
+    if replay_simulator.enabled:
+        logger.warning("⏪ Replay mode active: %s", replay_simulator.current_mode)
+        if replay_simulator.scenario_date:
+            logger.warning("⏪ Replay scenario timestamp: %s", replay_simulator.scenario_date)
         await replay_simulator.start()
     else:
         logger.info("🟢 Live mode active")
@@ -50,9 +49,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Shutting down Dashboard API...")
 
-    if scenario_mode.startswith("REPLAY"):
-        await replay_simulator.stop()
-
+    await replay_simulator.stop()
     await stop_bridge()
     await close_redis()
     await close_db()
@@ -91,24 +88,23 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root():
-        scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
-        scenario_date = os.getenv("SCENARIO_DATE", "")
+        status = app.state.replay_simulator.status()
         return {
             "service": "Emergency Response System — Dashboard API",
             "version": "1.0.0",
             "scenario": {
-                "mode": scenario_mode,
-                "date": scenario_date,
-                "replay": scenario_mode.startswith("REPLAY"),
+                "mode": status["mode"],
+                "date": status["scenario_date"],
+                "replay": status["enabled"],
+                "running": status["running"],
+                "paused": status["paused"],
+                "tick": status["tick"],
             },
         }
 
     @app.get("/health")
     async def health():
         from app.services.db import get_pool
-
-        scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
-        scenario_date = os.getenv("SCENARIO_DATE", "")
 
         db_status = "ok"
         try:
@@ -119,14 +115,18 @@ def create_app() -> FastAPI:
             db_status = f"error: {exc}"
 
         redis_status = "ok" if await redis_ok() else "unavailable"
+        replay_status_data = app.state.replay_simulator.status()
 
         return {
             "status": "healthy" if db_status == "ok" else "degraded",
             "database": db_status,
             "redis": redis_status,
             "version": "1.0.0",
-            "scenario_mode": scenario_mode,
-            "scenario_date": scenario_date,
+            "scenario_mode": replay_status_data["mode"],
+            "scenario_date": replay_status_data["scenario_date"],
+            "replay_running": replay_status_data["running"],
+            "replay_paused": replay_status_data["paused"],
+            "replay_tick": replay_status_data["tick"],
         }
 
     @app.get("/api/replay/status")
@@ -137,16 +137,15 @@ def create_app() -> FastAPI:
     @app.post("/api/replay/start")
     async def replay_start():
         simulator = app.state.replay_simulator
-        if not simulator.enabled:
-            raise HTTPException(status_code=400, detail="Replay mode is not enabled")
-        await simulator.resume()
+        set_mode("REPLAY_2022", "2022-06-17T09:00:00Z")
+        await simulator.switch_to_replay()
         return simulator.status()
 
     @app.post("/api/replay/pause")
     async def replay_pause():
         simulator = app.state.replay_simulator
         if not simulator.enabled:
-            raise HTTPException(status_code=400, detail="Replay mode is not enabled")
+            raise HTTPException(status_code=400, detail="Replay mode is not active")
         await simulator.pause()
         return simulator.status()
 
@@ -154,8 +153,15 @@ def create_app() -> FastAPI:
     async def replay_reset():
         simulator = app.state.replay_simulator
         if not simulator.enabled:
-            raise HTTPException(status_code=400, detail="Replay mode is not enabled")
+            raise HTTPException(status_code=400, detail="Replay mode is not active")
         await simulator.reset()
+        return simulator.status()
+
+    @app.post("/api/replay/stop")
+    async def replay_stop():
+        simulator = app.state.replay_simulator
+        set_mode("LIVE")
+        await simulator.switch_to_live()
         return simulator.status()
 
     return app

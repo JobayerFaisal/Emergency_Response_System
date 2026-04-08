@@ -56,6 +56,8 @@ from backend.src.agents.agent_1_environmental.predictor import (
     AlertGenerator,
     PredictionOrchestrator
 )
+from backend.app.config.scenario import set_redis_client
+
 
 # Configure logging
 # FIX 1: Force UTF-8 on the stream handler so emoji characters (✅ etc.)
@@ -209,6 +211,7 @@ class EnvironmentalIntelligenceAgent:
                 if _inspect.isawaitable(_ping):
                     await _ping
                 logger.info("Redis connection established")
+                set_redis_client(self.redis_client)
             except Exception as e:
                 logger.warning(f"Redis unavailable ({e}) — running without cache")
                 self.redis_client = None

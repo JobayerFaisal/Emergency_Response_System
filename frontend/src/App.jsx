@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+// frontend/src/App.jsx
+
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import KPIBar from './components/layout/KPIBar.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import MainMap from './components/map/MainMap.jsx'
@@ -37,23 +39,33 @@ export default function App() {
   const [activeAgent, setActiveAgent] = useState(null)
   const [sidebarTab, setSidebarTab] = useState('feed')
   const [replayState, setReplayState] = useState({
+    mode: 'LIVE',
     enabled: false,
     running: false,
     paused: false,
     tick: 0,
+    scenario_date: '',
   })
   const [replayBusy, setReplayBusy] = useState(false)
+  const [eventResetToken, setEventResetToken] = useState(0)
 
-  const { events, connected } = useWebSocket('ws://localhost:8005/ws')
-  const { kpi, agents } = useDashboard()
+  const isReplay = replayState.mode !== 'LIVE'
+
+  const { events, connected } = useWebSocket('ws://localhost:8005/ws', {
+    paused: isReplay,
+    resetToken: eventResetToken,
+  })
+  const { kpi, agents, refreshDashboard } = useDashboard({ paused: isReplay })
   const { zones } = useZones()
 
-  const scenarioMode = import.meta.env.VITE_SCENARIO_MODE || 'LIVE'
-  const scenarioDate = import.meta.env.VITE_SCENARIO_DATE || ''
-  const isReplay = scenarioMode !== 'LIVE'
-
-  const scenarioLabel = useMemo(() => formatScenarioLabel(scenarioMode), [scenarioMode])
-  const scenarioTimeLabel = useMemo(() => formatScenarioTimestamp(scenarioDate), [scenarioDate])
+  const scenarioLabel = useMemo(
+    () => formatScenarioLabel(replayState.mode),
+    [replayState.mode]
+  )
+  const scenarioTimeLabel = useMemo(
+    () => formatScenarioTimestamp(replayState.scenario_date),
+    [replayState.scenario_date]
+  )
 
   const toggleLayer = (layer) => {
     setActiveLayers((prev) => ({ ...prev, [layer]: !prev[layer] }))
@@ -64,8 +76,7 @@ export default function App() {
     setSidebarTab('agent')
   }
 
-  const loadReplayStatus = async () => {
-    if (!isReplay) return
+  const loadReplayStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/replay/status')
       if (!res.ok) throw new Error(`Replay status failed: ${res.status}`)
@@ -74,29 +85,38 @@ export default function App() {
     } catch (err) {
       console.error(err)
     }
-  }
+  }, [])
 
-  const sendReplayAction = async (path) => {
+  const sendReplayAction = useCallback(async (path) => {
     try {
       setReplayBusy(true)
       const res = await fetch(path, { method: 'POST' })
       if (!res.ok) throw new Error(`Replay action failed: ${res.status}`)
       const json = await res.json()
       setReplayState(json)
+
+      if (path === '/api/replay/stop') {
+        setEventResetToken((prev) => prev + 1)
+        await refreshDashboard()
+      }
     } catch (err) {
       console.error(err)
     } finally {
       setReplayBusy(false)
     }
-  }
+  }, [refreshDashboard])
 
   useEffect(() => {
     loadReplayStatus()
-    if (!isReplay) return
-
-    const timer = setInterval(loadReplayStatus, 3000)
+    const timer = setInterval(loadReplayStatus, 15000)
     return () => clearInterval(timer)
-  }, [isReplay])
+  }, [loadReplayStatus])
+
+  useEffect(() => {
+    if (!isReplay) {
+      refreshDashboard()
+    }
+  }, [isReplay, refreshDashboard])
 
   return (
     <div className="app-shell" style={{ position: 'relative' }}>
@@ -144,13 +164,23 @@ export default function App() {
             </span>
             <span style={{ fontSize: 12, color: 'rgba(226,232,240,0.82)' }}>
               {isReplay
-                ? `Scenario source: 2022 Sylhet flood replay${scenarioTimeLabel ? ` · ${scenarioTimeLabel}` : ''}`
+                ? `Scenario source: historical replay${scenarioTimeLabel ? ` · ${scenarioTimeLabel}` : ''}`
                 : 'Scenario source: real-time weather, river, and agent streams'}
             </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {!isReplay && (
+            <button
+              onClick={() => sendReplayAction('/api/replay/start')}
+              disabled={replayBusy}
+              style={buttonStyle('#6d28d9')}
+            >
+              ⏪ Historical Replay
+            </button>
+          )}
+
           {isReplay && (
             <>
               <button
@@ -173,6 +203,13 @@ export default function App() {
                 style={buttonStyle('#6d28d9')}
               >
                 ↺ Reset
+              </button>
+              <button
+                onClick={() => sendReplayAction('/api/replay/stop')}
+                disabled={replayBusy}
+                style={buttonStyle('#059669')}
+              >
+                🟢 Return to Live
               </button>
               <span style={{ fontSize: 12, color: '#dbeafe' }}>
                 {replayState.paused ? 'Paused' : replayState.running ? 'Running' : 'Stopped'} · Tick {replayState.tick}

@@ -1,56 +1,64 @@
 import { useEffect } from 'react'
 
 const SOURCE_ID = 'rivers'
-const LAYER_ID  = 'river-lines'
+const LAYER_ID = 'river-lines'
+const EMPTY_FC = { type: 'FeatureCollection', features: [] }
 
-/**
- * RiverLayer
- * Renders river discharge lines on the MapLibre map.
- *
- * Props:
- *   map     - maplibregl.Map instance
- *   geojson - GeoJSON FeatureCollection; each feature needs properties.discharge (m³/s)
- *   visible - boolean, controlled by LayerControls (activeLayers.river)
- *
- * Color scale (discharge m³/s):
- *   0    → blue   (normal flow)
- *   500  → orange (elevated)
- *   1000 → red    (danger / flood stage)
- */
+function hasStyle(map) {
+  return !!map && !!map.style
+}
+
+function safeGetLayer(map, id) {
+  if (!hasStyle(map)) return null
+  try {
+    return map.getLayer(id)
+  } catch {
+    return null
+  }
+}
+
+function safeGetSource(map, id) {
+  if (!hasStyle(map)) return null
+  try {
+    return map.getSource(id)
+  } catch {
+    return null
+  }
+}
+
 export default function RiverLayer({ map, geojson, visible }) {
-
   useEffect(() => {
     if (!map) return
 
     const onLoad = () => {
-      if (!map.getSource(SOURCE_ID)) {
+      if (!safeGetSource(map, SOURCE_ID)) {
         map.addSource(SOURCE_ID, {
           type: 'geojson',
-          data: geojson || { type: 'FeatureCollection', features: [] },
+          data: geojson || EMPTY_FC,
         })
       }
 
-      if (!map.getLayer(LAYER_ID)) {
+      if (!safeGetLayer(map, LAYER_ID)) {
         map.addLayer({
           id: LAYER_ID,
           type: 'line',
           source: SOURCE_ID,
           layout: {
             'line-join': 'round',
-            'line-cap':  'round',
+            'line-cap': 'round',
           },
           paint: {
             'line-color': [
               'interpolate', ['linear'], ['get', 'discharge'],
-              0,    '#2288cc',
-              300,  '#00aaff',
-              600,  '#ffaa00',
+              0, '#2288cc',
+              300, '#00aaff',
+              600, '#ffaa00',
               1000, '#ff3300',
             ],
             'line-width': [
               'interpolate', ['linear'], ['get', 'discharge'],
-              0,    1.5,
-              500,  3,
+              0, 1.5,
+              500, 3,
               1000, 5,
             ],
             'line-opacity': 0.85,
@@ -59,29 +67,41 @@ export default function RiverLayer({ map, geojson, visible }) {
       }
     }
 
-    if (map.isStyleLoaded()) {
+    if (hasStyle(map) && map.isStyleLoaded()) {
       onLoad()
     } else {
       map.once('load', onLoad)
     }
 
     return () => {
-      if (map.getLayer(LAYER_ID))  map.removeLayer(LAYER_ID)
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
+      if (!hasStyle(map)) return
+      try {
+        if (safeGetLayer(map, LAYER_ID)) map.removeLayer(LAYER_ID)
+        if (safeGetSource(map, SOURCE_ID)) map.removeSource(SOURCE_ID)
+      } catch {
+        // ignore during teardown
+      }
     }
   }, [map])
 
   useEffect(() => {
-    if (!map || !map.getSource(SOURCE_ID)) return
-    map.getSource(SOURCE_ID).setData(
-      geojson || { type: 'FeatureCollection', features: [] }
-    )
+    const source = safeGetSource(map, SOURCE_ID)
+    if (!source) return
+    try {
+      source.setData(geojson || EMPTY_FC)
+    } catch {
+      // ignore during teardown
+    }
   }, [map, geojson])
 
   useEffect(() => {
-    if (!map || !map.isStyleLoaded()) return
-    if (map.getLayer(LAYER_ID)) {
-      map.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none')
+    if (!hasStyle(map)) return
+    if (safeGetLayer(map, LAYER_ID)) {
+      try {
+        map.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none')
+      } catch {
+        // ignore during teardown
+      }
     }
   }, [map, visible])
 

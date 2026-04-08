@@ -1,3 +1,5 @@
+// frontend/src/components/map/LayerControls.jsx
+
 import React from 'react'
 
 const LAYERS = [
