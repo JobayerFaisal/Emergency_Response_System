@@ -1,34 +1,14 @@
 # backend/app/main.py
-
-"""
-backend/app/main.py
-====================
-Dashboard API — FastAPI root application.
-Runs on port 8005 (separate from the 4 agents on 8001-8004).
-
-Startup sequence:
-  1. init_db()        — asyncpg pool to PostgreSQL
-  2. init_redis()     — aioredis client
-  3. start_bridge()   — Redis pub/sub → WebSocket broadcast task
-
-Shutdown sequence (reverse):
-  1. stop_bridge()
-  2. close_redis()
-  3. close_db()
-
-All routers are mounted under /api/* with CORS enabled for React dev server.
-WebSocket endpoint is mounted at /ws.
-"""
-
 import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .services.db import init_db, close_db
-from .services.redis_bridge import init_redis, close_redis, start_bridge, stop_bridge
+from .services.redis_bridge import init_redis, close_redis, start_bridge, stop_bridge, redis_ok
+from .services.replay_simulator import ReplaySimulator
 from .routers import dashboard, zones, predictions, distress, resources, dispatch
 from .routers import kpi as kpi_router
 from .websocket import router as ws_router
@@ -39,77 +19,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dashboard.main")
 
+replay_simulator = ReplaySimulator()
 
-# ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup / shutdown hook."""
-
     logger.info("═" * 60)
     logger.info("  Emergency Response System — Dashboard API  v1.0.0")
     logger.info("═" * 60)
 
-    # ── Startup ──────────────────────────────────────────────────────────
+    scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
+    scenario_date = os.getenv("SCENARIO_DATE", "")
+
     await init_db()
     await init_redis()
     await start_bridge()
 
-    # ── DEBUG: verify data is in DB on startup ──────────────
-    try:
-        from app.services.db import get_pool
-        pool = get_pool()
-        async with pool.acquire() as conn:
-            zones     = await conn.fetchval("SELECT COUNT(*) FROM sentinel_zones")
-            preds     = await conn.fetchval("SELECT COUNT(*) FROM flood_predictions")
-            allocs    = await conn.fetchval("SELECT COUNT(*) FROM resource_allocations")
-            resources = await conn.fetchval("SELECT COUNT(*) FROM resource_units")
-            messages  = await conn.fetchval("SELECT COUNT(*) FROM agent_messages")
+    app.state.replay_simulator = replay_simulator
 
-            logger.info("━" * 50)
-            logger.info("📊 DATABASE SNAPSHOT ON STARTUP:")
-            logger.info("   sentinel_zones      : %d rows", zones)
-            logger.info("   flood_predictions   : %d rows", preds)
-            logger.info("   resource_allocations: %d rows", allocs)
-            logger.info("   resource_units      : %d rows", resources)
-            logger.info("   agent_messages      : %d rows", messages)
-            logger.info("━" * 50)
-    except Exception as e:
-        logger.error("❌ DB snapshot failed: %s", e)
+    if scenario_mode.startswith("REPLAY"):
+        logger.warning("⏪ Replay mode active: %s", scenario_mode)
+        if scenario_date:
+            logger.warning("⏪ Replay scenario timestamp: %s", scenario_date)
+        await replay_simulator.start()
+    else:
+        logger.info("🟢 Live mode active")
 
     logger.info("✅ Dashboard API ready on port 8005")
-    logger.info("   Routers : /api/dashboard | /api/zones | /api/predictions")
-    logger.info("             /api/distress  | /api/resources | /api/dispatch")
-    logger.info("   WebSocket: ws://localhost:8005/ws")
-
     yield
 
-    # ── Shutdown ─────────────────────────────────────────────────────────
     logger.info("Shutting down Dashboard API...")
+
+    if scenario_mode.startswith("REPLAY"):
+        await replay_simulator.stop()
+
     await stop_bridge()
     await close_redis()
     await close_db()
+
     logger.info("Dashboard API shutdown complete")
 
-
-# ── App factory ───────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Emergency Response System — Dashboard API",
-        description=(
-            "Real-time dashboard backend for the Bangladesh Flood Intelligence System. "
-            "Aggregates data from all 4 AI agents and exposes REST + WebSocket endpoints "
-            "consumed by the React frontend."
-        ),
         version="1.0.0",
         lifespan=lifespan,
-        docs_url="/docs",
-        redoc_url="/redoc",
     )
 
-    # ── CORS ─────────────────────────────────────────────────────────────
-    # Allow React dev server (port 3000) and production build (port 80)
     allowed_origins = os.getenv(
         "CORS_ORIGINS",
         "http://localhost:3000,http://localhost:5173,http://localhost:80,http://frontend:3000",
@@ -123,7 +80,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Routers ───────────────────────────────────────────────────────────
     app.include_router(kpi_router.router)
     app.include_router(dashboard.router)
     app.include_router(zones.router)
@@ -133,31 +89,26 @@ def create_app() -> FastAPI:
     app.include_router(dispatch.router)
     app.include_router(ws_router)
 
-    # ── Health / root ─────────────────────────────────────────────────────
-    @app.get("/", tags=["health"])
+    @app.get("/")
     async def root():
+        scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
+        scenario_date = os.getenv("SCENARIO_DATE", "")
         return {
-            "service":  "Emergency Response System — Dashboard API",
-            "version":  "1.0.0",
-            "status":   "operational",
-            "endpoints": {
-                "kpi":         "/api/kpi",
-            "agents":       "/api/agents/{agent1|agent2|agent3|agent4}",
-            "dashboard":   "/api/dashboard",
-                "zones":       "/api/zones",
-                "predictions": "/api/predictions",
-                "distress":    "/api/distress",
-                "resources":   "/api/resources",
-                "dispatch":    "/api/dispatch",
-                "websocket":   "/ws",
-                "docs":        "/docs",
+            "service": "Emergency Response System — Dashboard API",
+            "version": "1.0.0",
+            "scenario": {
+                "mode": scenario_mode,
+                "date": scenario_date,
+                "replay": scenario_mode.startswith("REPLAY"),
             },
         }
 
-    @app.get("/health", tags=["health"])
+    @app.get("/health")
     async def health():
-        from app.services.redis_bridge import redis_ok
         from app.services.db import get_pool
+
+        scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
+        scenario_date = os.getenv("SCENARIO_DATE", "")
 
         db_status = "ok"
         try:
@@ -170,20 +121,48 @@ def create_app() -> FastAPI:
         redis_status = "ok" if await redis_ok() else "unavailable"
 
         return {
-            "status":        "healthy" if db_status == "ok" else "degraded",
-            "database":      db_status,
-            "redis":         redis_status,
-            "version":       "1.0.0",
+            "status": "healthy" if db_status == "ok" else "degraded",
+            "database": db_status,
+            "redis": redis_status,
+            "version": "1.0.0",
+            "scenario_mode": scenario_mode,
+            "scenario_date": scenario_date,
         }
+
+    @app.get("/api/replay/status")
+    async def replay_status():
+        simulator = app.state.replay_simulator
+        return simulator.status()
+
+    @app.post("/api/replay/start")
+    async def replay_start():
+        simulator = app.state.replay_simulator
+        if not simulator.enabled:
+            raise HTTPException(status_code=400, detail="Replay mode is not enabled")
+        await simulator.resume()
+        return simulator.status()
+
+    @app.post("/api/replay/pause")
+    async def replay_pause():
+        simulator = app.state.replay_simulator
+        if not simulator.enabled:
+            raise HTTPException(status_code=400, detail="Replay mode is not enabled")
+        await simulator.pause()
+        return simulator.status()
+
+    @app.post("/api/replay/reset")
+    async def replay_reset():
+        simulator = app.state.replay_simulator
+        if not simulator.enabled:
+            raise HTTPException(status_code=400, detail="Replay mode is not enabled")
+        await simulator.reset()
+        return simulator.status()
 
     return app
 
 
-# ── Singleton used by uvicorn ─────────────────────────────────────────────────
 app = create_app()
 
-
-# ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
 

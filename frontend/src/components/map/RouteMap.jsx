@@ -1,54 +1,34 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
-const SOURCE_ID    = 'osrm-routes'
-const LAYER_BG     = 'route-bg'
-const LAYER_LINE   = 'route-line'
-const LAYER_DASH   = 'route-dash'
-
-/**
- * RouteMap
- * Renders OSRM dispatch routes on the MapLibre map with an animated dashed overlay.
- *
- * Props:
- *   map      - maplibregl.Map instance
- *   routes   - array from Agent4 data:
- *              [{
- *                mission_id, volunteer_id, status,
- *                geometry: GeoJSON LineString,   ← from OSRM
- *                distance_km, eta_minutes
- *              }]
- *   visible  - boolean, controlled by LayerControls (activeLayers.routes)
- *
- * Route colors by mission status:
- *   ASSIGNED / EN_ROUTE → cyan animated dash
- *   ACTIVE              → orange
- *   COMPLETED           → green (static)
- *   FAILED              → red   (static)
- */
+const SOURCE_ID = 'osrm-routes'
+const LAYER_BG = 'route-bg'
+const LAYER_LINE = 'route-line'
+const LAYER_DASH = 'route-dash'
+const LAYER_ARROW = 'route-arrow'
 
 const STATUS_COLOR = {
-  ASSIGNED:  '#00c8ff',
-  EN_ROUTE:  '#00c8ff',
-  ACTIVE:    '#ffaa00',
-  COMPLETED: '#00e676',
-  FAILED:    '#ff3d00',
+  ASSIGNED: '#38bdf8',
+  EN_ROUTE: '#22d3ee',
+  ACTIVE: '#f59e0b',
+  COMPLETED: '#22c55e',
+  FAILED: '#ef4444',
 }
 
 function buildFeatureCollection(routes) {
   return {
     type: 'FeatureCollection',
     features: routes
-      .filter(r => r.geometry)
-      .map(r => ({
+      .filter((r) => r.geometry?.coordinates?.length)
+      .map((r) => ({
         type: 'Feature',
         geometry: r.geometry,
         properties: {
-          mission_id:   r.mission_id,
+          mission_id: r.mission_id,
           volunteer_id: r.volunteer_id,
-          status:       r.status || 'ASSIGNED',
-          color:        STATUS_COLOR[r.status] || '#00c8ff',
-          eta:          r.eta_minutes,
-          distance:     r.distance_km,
+          status: r.status || 'ASSIGNED',
+          color: STATUS_COLOR[r.status] || '#38bdf8',
+          eta: r.eta_minutes,
+          distance: r.distance_km,
         },
       })),
   }
@@ -56,9 +36,13 @@ function buildFeatureCollection(routes) {
 
 export default function RouteMap({ map, routes = [], visible }) {
   const animFrameRef = useRef(null)
-  const dashOffsetRef = useRef(0)
+  const dashPhaseRef = useRef(0)
 
-  // Add source + layers once
+  const featureCollection = useMemo(
+    () => buildFeatureCollection(routes),
+    [routes]
+  )
+
   useEffect(() => {
     if (!map) return
 
@@ -66,68 +50,123 @@ export default function RouteMap({ map, routes = [], visible }) {
       if (!map.getSource(SOURCE_ID)) {
         map.addSource(SOURCE_ID, {
           type: 'geojson',
-          data: buildFeatureCollection(routes),
+          data: featureCollection,
         })
       }
 
-      // Background glow line
       if (!map.getLayer(LAYER_BG)) {
         map.addLayer({
           id: LAYER_BG,
           type: 'line',
           source: SOURCE_ID,
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
           paint: {
             'line-color': ['get', 'color'],
-            'line-width': 8,
+            'line-width': 12,
             'line-opacity': 0.18,
-            'line-blur': 4,
+            'line-blur': 6,
           },
         })
       }
 
-      // Solid base route line
       if (!map.getLayer(LAYER_LINE)) {
         map.addLayer({
           id: LAYER_LINE,
           type: 'line',
           source: SOURCE_ID,
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
           paint: {
             'line-color': ['get', 'color'],
-            'line-width': 2.5,
-            'line-opacity': 0.75,
+            'line-width': [
+              'case',
+              ['==', ['get', 'status'], 'ACTIVE'], 4.5,
+              ['==', ['get', 'status'], 'EN_ROUTE'], 4,
+              3.2,
+            ],
+            'line-opacity': [
+              'case',
+              ['==', ['get', 'status'], 'ACTIVE'], 1.0,
+              ['==', ['get', 'status'], 'EN_ROUTE'], 0.92,
+              ['==', ['get', 'status'], 'ASSIGNED'], 0.78,
+              ['==', ['get', 'status'], 'COMPLETED'], 0.55,
+              0.5,
+            ],
           },
         })
       }
 
-      // Animated dashed overlay (for active routes)
       if (!map.getLayer(LAYER_DASH)) {
         map.addLayer({
           id: LAYER_DASH,
           type: 'line',
           source: SOURCE_ID,
           filter: ['in', ['get', 'status'], ['literal', ['ASSIGNED', 'EN_ROUTE', 'ACTIVE']]],
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
           paint: {
-            'line-color': ['get', 'color'],
-            'line-width': 3,
-            'line-dasharray': [0, 4, 3],
-            'line-opacity': 0.9,
+            'line-color': '#ffffff',
+            'line-width': [
+              'case',
+              ['==', ['get', 'status'], 'ACTIVE'], 2.6,
+              2.1,
+            ],
+            'line-opacity': [
+              'case',
+              ['==', ['get', 'status'], 'ACTIVE'], 0.98,
+              0.88,
+            ],
+            'line-dasharray': [0, 2, 3],
           },
         })
       }
 
-      // Animate the dash
+      if (!map.getLayer(LAYER_ARROW)) {
+        map.addLayer({
+          id: LAYER_ARROW,
+          type: 'symbol',
+          source: SOURCE_ID,
+          filter: ['in', ['get', 'status'], ['literal', ['ASSIGNED', 'EN_ROUTE', 'ACTIVE']]],
+          layout: {
+            'symbol-placement': 'line',
+            'symbol-spacing': 60,
+            'text-field': '▶',
+            'text-size': 12,
+            'text-keep-upright': false,
+            'text-rotation-alignment': 'map',
+            'text-font': ['Open Sans Regular'],
+          },
+          paint: {
+            'text-color': '#dff6ff',
+            'text-opacity': 0.88,
+            'text-halo-color': 'rgba(0,0,0,0.35)',
+            'text-halo-width': 1,
+          },
+        })
+      }
+
       const animateDash = () => {
-        dashOffsetRef.current = (dashOffsetRef.current - 0.5) % 10
+        dashPhaseRef.current += 0.08
+        const phase = dashPhaseRef.current % 4
+
         if (map.getLayer(LAYER_DASH)) {
           map.setPaintProperty(LAYER_DASH, 'line-dasharray', [
-            dashOffsetRef.current, 4, 3,
+            phase,
+            2,
+            3,
           ])
         }
+
         animFrameRef.current = requestAnimationFrame(animateDash)
       }
+
       animateDash()
     }
 
@@ -138,26 +177,27 @@ export default function RouteMap({ map, routes = [], visible }) {
     }
 
     return () => {
-      cancelAnimationFrame(animFrameRef.current)
-      if (map.getLayer(LAYER_DASH))  map.removeLayer(LAYER_DASH)
-      if (map.getLayer(LAYER_LINE))  map.removeLayer(LAYER_LINE)
-      if (map.getLayer(LAYER_BG))    map.removeLayer(LAYER_BG)
-      if (map.getSource(SOURCE_ID))  map.removeSource(SOURCE_ID)
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+      if (map.getLayer(LAYER_ARROW)) map.removeLayer(LAYER_ARROW)
+      if (map.getLayer(LAYER_DASH)) map.removeLayer(LAYER_DASH)
+      if (map.getLayer(LAYER_LINE)) map.removeLayer(LAYER_LINE)
+      if (map.getLayer(LAYER_BG)) map.removeLayer(LAYER_BG)
+      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
     }
   }, [map])
 
-  // Update route data
   useEffect(() => {
     if (!map || !map.getSource(SOURCE_ID)) return
-    map.getSource(SOURCE_ID).setData(buildFeatureCollection(routes))
-  }, [map, routes])
+    map.getSource(SOURCE_ID).setData(featureCollection)
+  }, [map, featureCollection])
 
-  // Toggle visibility
   useEffect(() => {
     if (!map || !map.isStyleLoaded()) return
     const vis = visible ? 'visible' : 'none'
-    ;[LAYER_BG, LAYER_LINE, LAYER_DASH].forEach(id => {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis)
+    ;[LAYER_BG, LAYER_LINE, LAYER_DASH, LAYER_ARROW].forEach((id) => {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', vis)
+      }
     })
   }, [map, visible])
 

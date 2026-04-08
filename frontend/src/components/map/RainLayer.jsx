@@ -1,38 +1,47 @@
-// RainLayer.jsx
-// Adds an animated rain canvas overlay on top of the MapLibre map.
-// Mount this as a sibling of <MainMap /> inside .map-area when activeLayers.rain is true.
 import React, { useRef, useEffect } from 'react'
 
-const DROPS = 120
+const BASE_DROPS = 120
 
-export default function RainLayer({ active }) {
+export default function RainLayer({ active, intensity = 0 }) {
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
 
   useEffect(() => {
     if (!active) return
+
     const canvas = canvasRef.current
+    if (!canvas) return
+
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const safeIntensity = Math.max(0, Math.min(1, Number(intensity) || 0))
 
     const resize = () => {
       canvas.width = canvas.offsetWidth
       canvas.height = canvas.offsetHeight
     }
+
     resize()
     window.addEventListener('resize', resize)
 
-    const drops = Array.from({ length: DROPS }, () => ({
+    const dropCount = Math.max(
+      BASE_DROPS,
+      Math.floor(BASE_DROPS * (1 + safeIntensity * 4))
+    )
+
+    const drops = Array.from({ length: dropCount }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
-      len: 10 + Math.random() * 20,
-      speed: 4 + Math.random() * 6,
-      opacity: 0.15 + Math.random() * 0.3,
+      len: Math.random() * 18 + 10,
+      speed: Math.random() * (2 + safeIntensity * 4) + 2,
+      opacity: Math.random() * 0.5 + 0.2,
     }))
 
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      drops.forEach(d => {
+      drops.forEach((d) => {
         ctx.beginPath()
         ctx.strokeStyle = `rgba(160, 210, 255, ${d.opacity})`
         ctx.lineWidth = 1
@@ -51,13 +60,14 @@ export default function RainLayer({ active }) {
 
       rafRef.current = requestAnimationFrame(draw)
     }
+
     draw()
 
     return () => {
-      cancelAnimationFrame(rafRef.current)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [active])
+  }, [active, intensity])
 
   if (!active) return null
 
@@ -66,9 +76,12 @@ export default function RainLayer({ active }) {
       ref={canvasRef}
       className="rain-canvas"
       style={{
-        position: 'absolute', inset: 0,
-        width: '100%', height: '100%',
-        pointerEvents: 'none', zIndex: 5,
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 5,
       }}
     />
   )

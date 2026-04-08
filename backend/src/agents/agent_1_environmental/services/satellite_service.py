@@ -23,6 +23,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+from backend.app.config.scenario import is_replay, get_scenario_date
 
 # =====================================================================
 # DATA MODELS
@@ -437,13 +438,77 @@ class SatelliteDataCollector:
                 error=str(e),
             )
 
+
+
     async def fetch_satellite_data(self, zone, zone_id: Optional[str] = None) -> SatelliteData:
         """
         Fetch satellite flood detection data for a single zone.
         Non-blocking — runs GEE+TF calls in a thread pool.
+
+        In replay mode, bypasses live GEE/CNN calls and returns deterministic
+        historical-style flood conditions for demo stability.
         """
+        from backend.app.config.scenario import is_replay, get_scenario_date
+
         zid = zone_id or str(zone.id)
         cache_key = f"satellite:{zid}"
+
+        # -----------------------------------------------------------------
+        # REPLAY MODE
+        # -----------------------------------------------------------------
+        if is_replay():
+            logger.warning(f"[REPLAY MODE] Using simulated satellite data for {zone.name}")
+
+            # Tune per zone risk level for a believable scenario
+            risk_level_value = getattr(zone.risk_level, "value", str(zone.risk_level)).lower()
+
+            if risk_level_value == "critical":
+                flood_pct = 38.0
+                risk_level = "CRITICAL"
+            elif risk_level_value == "high":
+                flood_pct = 24.0
+                risk_level = "HIGH"
+            elif risk_level_value == "moderate":
+                flood_pct = 12.0
+                risk_level = "MEDIUM"
+            else:
+                flood_pct = 5.5
+                risk_level = "LOW"
+
+            bounds = self._zone_to_bounds(zone)
+
+            return SatelliteData(
+                zone_id=zid,
+                timestamp=datetime.fromisoformat(get_scenario_date().replace("Z", "+00:00")),
+                flood_detection=FloodDetectionResult(
+                    zone_id=zid,
+                    zone_name=zone.name,
+                    bounds=bounds,
+                    timestamp=get_scenario_date(),
+                    reference_date="2022-05-25",
+                    current_date="2022-06-17",
+                    flood_detected=True,
+                    flood_percentage=flood_pct,
+                    permanent_water_pct=4.5,
+                    current_water_pct=min(flood_pct + 6.0, 100.0),
+                    risk_level=risk_level,
+                    status="REPLAY FLOOD EVENT",
+                    confidence=0.95,
+                    flood_area_km2=round((zone.radius_km ** 2) * 3.1416 * (flood_pct / 100.0), 3),
+                    raw_predictions={
+                        "mode": "replay_2022_sylhet",
+                        "note": "Simulated historical SAR flood result for demo",
+                    },
+                    error=None,
+                ),
+                sar_available=True,
+                source="replay_2022",
+                processing_time_seconds=0.01,
+            )
+
+        # -----------------------------------------------------------------
+        # LIVE MODE
+        # -----------------------------------------------------------------
 
         # Check cache
         if self.cache_client:
@@ -496,6 +561,7 @@ class SatelliteDataCollector:
                 logger.error(f"Satellite cache store error: {e}")
 
         return satellite_data
+
 
     async def fetch_multiple_zones(self, zones: list) -> Dict[str, SatelliteData]:
         """Fetch satellite data for multiple zones (sequential for GEE rate limits)"""

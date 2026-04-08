@@ -31,7 +31,7 @@ from backend.src.agents.agent_1_environmental.models import (
     SocialMediaPost, GeoPoint, SentinelZone, DataSource, BoundingBox
 )
 from backend.src.agents.agent_1_environmental.services.satellite_service import SatelliteDataCollector, SatelliteData
-
+from backend.app.config.scenario import is_replay, get_scenario_date
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,11 @@ class WeatherAPICollector:
         # Clouds (801-809)
         else:
             return WeatherCondition.CLOUDS
-    
+
+
+
+
+
     async def fetch_current_weather(
         self,
         location: GeoPoint,
@@ -156,16 +160,57 @@ class WeatherAPICollector:
     ) -> Optional[WeatherData]:
         """
         Fetch current weather for a location.
-        
-        Args:
-            location: Geographic point to fetch weather for
-            zone_id: Optional zone identifier for caching
-            
-        Returns:
-            WeatherData object or None if fetch fails
+
+        In replay mode, returns deterministic historical-style monsoon weather
+        for demo stability instead of calling the live API.
         """
+        from backend.app.config.scenario import is_replay, get_scenario_date
+
         cache_key = f"weather:{location.latitude}:{location.longitude}"
-        
+
+        # -----------------------------------------------------------------
+        # REPLAY MODE
+        # -----------------------------------------------------------------
+        if is_replay():
+            logger.warning(
+                f"[REPLAY MODE] Using simulated weather for "
+                f"({location.latitude}, {location.longitude})"
+            )
+
+            return WeatherData(
+                location=location,
+                timestamp=datetime.fromisoformat(get_scenario_date().replace("Z", "+00:00")),
+                condition=WeatherCondition.HEAVY_RAIN,
+                metrics=WeatherMetrics(
+                    temperature=27.8,
+                    feels_like=32.1,
+                    humidity=93.0,
+                    pressure=1001.0,
+                    wind_speed=7.2,
+                    wind_direction=190,
+                    visibility=2800,
+                    cloud_coverage=96.0
+                ),
+                precipitation=PrecipitationData(
+                    rain_1h=18.0,
+                    rain_3h=46.0,
+                    rain_24h=210.0,
+                    snow_1h=None,
+                    snow_3h=None,
+                    intensity=18.0
+                ),
+                description="Heavy monsoon rainfall (replay 2022)",
+                source=DataSource.OPENWEATHERMAP,
+                raw_data={
+                    "mode": "replay_2022_sylhet",
+                    "note": "Simulated historical weather for demo",
+                }
+            )
+
+        # -----------------------------------------------------------------
+        # LIVE MODE
+        # -----------------------------------------------------------------
+
         # Check cache first
         cached = await self._get_from_cache(cache_key)
         if cached:
@@ -173,10 +218,10 @@ class WeatherAPICollector:
                 return WeatherData(**cached)
             except Exception as e:
                 logger.error(f"Error parsing cached weather data: {e}")
-        
+
         # Enforce rate limit
         await self._check_rate_limit()
-        
+
         # Fetch from API
         params = {
             'lat': location.latitude,
@@ -184,47 +229,48 @@ class WeatherAPICollector:
             'appid': self.api_key,
             'units': 'metric'
         }
-        
+
         url = f"{self.base_url}/weather"
-        
+
         try:
             async with ClientSession(timeout=self.timeout) as session:
                 async with session.get(url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
                         weather_data = self._parse_weather_response(data, location)
-                        
+
                         # Cache the result
                         await self._set_cache(
                             cache_key,
                             weather_data.model_dump()
                         )
-                        
+
                         logger.info(
                             f"Fetched weather for ({location.latitude}, {location.longitude}): "
                             f"{weather_data.condition.value}"
                         )
                         return weather_data
-                    
+
                     elif response.status == 429:
                         logger.error("API rate limit exceeded")
                         # Wait and retry once
                         await asyncio.sleep(5)
                         return await self.fetch_current_weather(location, zone_id)
-                    
+
                     else:
                         logger.error(
                             f"Weather API error: {response.status} - {await response.text()}"
                         )
                         return None
-        
+
         except ClientError as e:
             logger.error(f"Network error fetching weather: {e}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error fetching weather: {e}", exc_info=True)
             return None
-    
+            
+                
     def _parse_weather_response(
         self,
         data: Dict[str, Any],
@@ -743,16 +789,66 @@ class RiverLevelCollector:
             return "falling"
         return "stable"
 
+
+
     async def fetch_river_data(self, zone) -> Optional[dict]:
         """
         Fetch GloFAS river discharge for a single zone.
 
-        Returns a dict with keys:
-            zone_name, current_discharge_m3s, past_7day_avg_m3s,
-            forecast_7day_peak_m3s, discharge_ratio, trend, risk_factor
-        Or None if the API is unreachable or returns no data.
+        In replay mode, returns deterministic elevated river discharge values
+        representing a historical flood scenario.
         """
+        from backend.app.config.scenario import is_replay
+
         cache_key = f"river:{zone.id}"
+
+        # -----------------------------------------------------------------
+        # REPLAY MODE
+        # -----------------------------------------------------------------
+        if is_replay():
+            logger.warning(f"[REPLAY MODE] Using simulated river data for {zone.name}")
+
+            risk_level_value = getattr(zone.risk_level, "value", str(zone.risk_level)).lower()
+
+            if risk_level_value == "critical":
+                current = 9200.0
+                past_avg = 3200.0
+                peak = 12800.0
+                risk_factor = 0.92
+            elif risk_level_value == "high":
+                current = 6400.0
+                past_avg = 3000.0
+                peak = 9100.0
+                risk_factor = 0.78
+            elif risk_level_value == "moderate":
+                current = 4200.0
+                past_avg = 2800.0
+                peak = 6000.0
+                risk_factor = 0.56
+            else:
+                current = 2900.0
+                past_avg = 2400.0
+                peak = 3600.0
+                risk_factor = 0.28
+
+            ratio = round(current / past_avg, 3)
+
+            return {
+                "zone_name": zone.name,
+                "current_discharge_m3s": round(current, 1),
+                "past_7day_avg_m3s": round(past_avg, 1),
+                "forecast_7day_peak_m3s": round(peak, 1),
+                "discharge_ratio": ratio,
+                "trend": "rising",
+                "risk_factor": risk_factor,
+                "actual_lat": zone.center.latitude,
+                "actual_lon": zone.center.longitude,
+                "mode": "replay_2022_sylhet",
+            }
+
+        # -----------------------------------------------------------------
+        # LIVE MODE
+        # -----------------------------------------------------------------
 
         # Check cache first
         if self.cache_client:
@@ -762,13 +858,13 @@ class RiverLevelCollector:
                     import json
                     return json.loads(cached)
             except Exception:
-                pass  # Cache miss — continue to API
+                pass
 
         params = {
-            "latitude":      zone.center.latitude,
-            "longitude":     zone.center.longitude,
-            "daily":         "river_discharge",
-            "past_days":     7,
+            "latitude": zone.center.latitude,
+            "longitude": zone.center.longitude,
+            "daily": "river_discharge",
+            "past_days": 7,
             "forecast_days": 7,
         }
 
@@ -795,8 +891,8 @@ class RiverLevelCollector:
             return None
 
         # Parse response
-        daily      = data.get("daily", {})
-        times      = daily.get("time", [])
+        daily = data.get("daily", {})
+        times = daily.get("time", [])
         discharges = daily.get("river_discharge", [])
 
         if not times or not discharges:
@@ -809,8 +905,8 @@ class RiverLevelCollector:
 
         today = datetime.now(timezone.utc).date().isoformat()
 
-        past_vals     = []
-        current_val   = None
+        past_vals = []
+        current_val = None
         forecast_vals = []
 
         for t, d in zip(times, discharges):
@@ -824,28 +920,28 @@ class RiverLevelCollector:
                 forecast_vals.append(d)
 
         if current_val is None and past_vals:
-            current_val = past_vals[-1]   # Use most recent past if today missing
+            current_val = past_vals[-1]
 
         if current_val is None:
             logger.warning(f"[{zone.name}] GloFAS: no current discharge value")
             return None
 
-        past_avg      = sum(past_vals) / len(past_vals) if past_vals else current_val
+        past_avg = sum(past_vals) / len(past_vals) if past_vals else current_val
         forecast_peak = max(forecast_vals) if forecast_vals else current_val
-        ratio         = current_val / past_avg if past_avg > 0 else 1.0
-        trend         = self._compute_trend(past_vals + [current_val])
-        risk_factor   = self._compute_risk_factor(current_val, past_avg, forecast_peak)
+        ratio = current_val / past_avg if past_avg > 0 else 1.0
+        trend = self._compute_trend(past_vals + [current_val])
+        risk_factor = self._compute_risk_factor(current_val, past_avg, forecast_peak)
 
         result = {
-            "zone_name":               zone.name,
-            "current_discharge_m3s":   round(current_val,   1),
-            "past_7day_avg_m3s":       round(past_avg,      1),
-            "forecast_7day_peak_m3s":  round(forecast_peak, 1),
-            "discharge_ratio":         round(ratio,         3),
-            "trend":                   trend,
-            "risk_factor":             risk_factor,
-            "actual_lat":              data.get("latitude",  zone.center.latitude),
-            "actual_lon":              data.get("longitude", zone.center.longitude),
+            "zone_name": zone.name,
+            "current_discharge_m3s": round(current_val, 1),
+            "past_7day_avg_m3s": round(past_avg, 1),
+            "forecast_7day_peak_m3s": round(forecast_peak, 1),
+            "discharge_ratio": round(ratio, 3),
+            "trend": trend,
+            "risk_factor": risk_factor,
+            "actual_lat": data.get("latitude", zone.center.latitude),
+            "actual_lon": data.get("longitude", zone.center.longitude),
         }
 
         logger.info(
@@ -865,6 +961,7 @@ class RiverLevelCollector:
                 pass
 
         return result
+
 
     async def fetch_multiple_zones(self, zones: list) -> dict[str, Optional[dict]]:
         """Fetch river data for all zones concurrently."""

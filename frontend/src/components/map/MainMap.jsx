@@ -162,6 +162,17 @@ export default function MainMap({ zones, activeLayers, agents, events }) {
   const teams = useMemo(() => buildTeams(agents?.agent4, events), [agents?.agent4, events])
   const routes = useMemo(() => buildRoutes(agents?.agent4, events), [agents?.agent4, events])
 
+  const avgRisk = useMemo(() => {
+    const features = floodGeoJSON?.features || []
+    if (!features.length) return 0
+
+    const total = features.reduce((sum, f) => {
+      return sum + (f.properties?.risk || 0)
+    }, 0)
+
+    return total / features.length
+  }, [floodGeoJSON])
+
   useEffect(() => {
     if (mapRef.current) return
 
@@ -181,10 +192,14 @@ export default function MainMap({ zones, activeLayers, agents, events }) {
 
       if (floodGeoJSON.features.length) {
         const bounds = new maplibregl.LngLatBounds()
+
         floodGeoJSON.features.forEach((f) => {
-          const coords = f?.geometry?.coordinates?.[0] || []
-          coords.forEach(([lng, lat]) => bounds.extend([lng, lat]))
+          const polygonCoords = f?.geometry?.coordinates || []
+          polygonCoords.forEach((ring) => {
+            ring.forEach(([lng, lat]) => bounds.extend([lng, lat]))
+          })
         })
+
         if (!bounds.isEmpty()) {
           map.fitBounds(bounds, { padding: 40, duration: 0, maxZoom: 10 })
         }
@@ -198,18 +213,7 @@ export default function MainMap({ zones, activeLayers, agents, events }) {
       mapRef.current = null
       setMapReady(false)
     }
-  }, [])
-
-  const avgRisk = useMemo(() => {
-    const features = floodGeoJSON?.features || []
-    if (!features.length) return 0
-
-    const total = features.reduce((sum, f) => {
-      return sum + (f.properties?.risk || 0)
-    }, 0)
-
-    return total / features.length
-  }, [floodGeoJSON])  
+  }, [floodGeoJSON])
 
   return (
     <div className="main-map-wrapper" style={{ position: 'relative' }}>
@@ -249,7 +253,7 @@ export default function MainMap({ zones, activeLayers, agents, events }) {
         </>
       )}
 
-      <RainLayer active={activeLayers.rain} />
+      <RainLayer active={activeLayers.rain} intensity={avgRisk} />
     </div>
   )
 }
