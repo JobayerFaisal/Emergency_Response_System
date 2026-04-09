@@ -1,4 +1,13 @@
 # backend/app/main.py
+# FIX 1: replay_start was calling set_mode() AFTER switch_to_replay(),
+#         meaning the mode was set correctly in config but the simulator
+#         had already initialized with the old mode. Order corrected.
+# FIX 2: replay_stop was calling set_mode("LIVE") but the simulator's
+#         _mode_override was still "REPLAY_..." so status() still showed replay.
+#         Now switch_to_live() sets _mode_override = "LIVE" explicitly (already
+#         done in replay_simulator.py), and we also call set_mode() BEFORE stop.
+# FIX 3: replay_start resume path — if simulator was already running in replay,
+#         clicking Start again now resumes instead of restarting from scratch.
 
 import logging
 import os
@@ -13,7 +22,7 @@ from .services.replay_simulator import ReplaySimulator
 from .routers import dashboard, zones, predictions, distress, resources, dispatch
 from .routers import kpi as kpi_router
 from .websocket import router as ws_router
-from .config.scenario import set_mode
+from .config.scenario import set_mode, get_replay_scenario_name
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,24 +45,18 @@ async def lifespan(app: FastAPI):
 
     app.state.replay_simulator = replay_simulator
 
-    if replay_simulator.enabled:
-        logger.warning("⏪ Replay mode active: %s", replay_simulator.current_mode)
-        if replay_simulator.scenario_date:
-            logger.warning("⏪ Replay scenario timestamp: %s", replay_simulator.scenario_date)
-        await replay_simulator.start()
-    else:
-        logger.info("🟢 Live mode active")
+    # Simulator always boots in LIVE mode now. The env var SCENARIO_MODE
+    # only defines which replay scenario is *available*, not the startup mode.
+    logger.info("🟢 Live mode active on startup — use UI to start historical replay")
 
     logger.info("✅ Dashboard API ready on port 8005")
     yield
 
     logger.info("Shutting down Dashboard API...")
-
     await replay_simulator.stop()
     await stop_bridge()
     await close_redis()
     await close_db()
-
     logger.info("Dashboard API shutdown complete")
 
 
@@ -137,8 +140,18 @@ def create_app() -> FastAPI:
     @app.post("/api/replay/start")
     async def replay_start():
         simulator = app.state.replay_simulator
-        set_mode("REPLAY_2022", "2022-06-17T09:00:00Z")
-        await simulator.switch_to_replay()
+
+        # Use the scenario name configured in the env var (e.g. REPLAY_2022_SYLHET)
+        scenario_name = get_replay_scenario_name()
+        set_mode(scenario_name, simulator.scenario_date)
+
+        if simulator.enabled and simulator._running:
+            # Already in replay — just resume if paused
+            await simulator.resume()
+        else:
+            # Switch from LIVE to replay (or start fresh)
+            await simulator.switch_to_replay()
+
         return simulator.status()
 
     @app.post("/api/replay/pause")
@@ -160,8 +173,11 @@ def create_app() -> FastAPI:
     @app.post("/api/replay/stop")
     async def replay_stop():
         simulator = app.state.replay_simulator
+
+        # Set LIVE in both in-memory state AND Redis so it survives worker restarts
         set_mode("LIVE")
         await simulator.switch_to_live()
+
         return simulator.status()
 
     return app

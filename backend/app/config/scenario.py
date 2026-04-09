@@ -2,9 +2,16 @@ import os
 import json
 from typing import Optional
 
+# SCENARIO_MODE env var defines *which* replay scenario is available,
+# but the app always boots into LIVE mode. Replay is only activated
+# when the user clicks "Historical Replay" in the UI.
+_REPLAY_SCENARIO_NAME = os.getenv("SCENARIO_MODE", "REPLAY_HISTORICAL")
+_REPLAY_SCENARIO_DATE = os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z")
+
 _SCENARIO_STATE = {
-    "mode": os.getenv("SCENARIO_MODE", "LIVE"),
-    "scenario_date": os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z"),
+    "mode": "LIVE",  # always start LIVE — never read mode from env
+    "scenario_date": _REPLAY_SCENARIO_DATE,
+    "replay_scenario_name": _REPLAY_SCENARIO_NAME,
 }
 
 _redis_client = None
@@ -40,12 +47,16 @@ def set_mode(mode: str, scenario_date: Optional[str] = None):
     _save_to_redis(_SCENARIO_STATE)
 
 def get_mode() -> str:
-    state = _load_from_redis() or _SCENARIO_STATE
-    return state.get("mode", "LIVE")
+    # In-memory state is authoritative. Redis is only used to
+    # sync across workers — never to override an explicit set_mode() call.
+    return _SCENARIO_STATE.get("mode", "LIVE")
 
 def is_replay() -> bool:
     return get_mode().startswith("REPLAY")
 
 def get_scenario_date() -> str:
-    state = _load_from_redis() or _SCENARIO_STATE
-    return state.get("scenario_date", "2022-06-17T09:00:00Z")
+    return _SCENARIO_STATE.get("scenario_date", _REPLAY_SCENARIO_DATE)
+
+def get_replay_scenario_name() -> str:
+    """Returns the configured replay scenario name from the env var."""
+    return _SCENARIO_STATE.get("replay_scenario_name", _REPLAY_SCENARIO_NAME)

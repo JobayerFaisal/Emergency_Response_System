@@ -1,4 +1,12 @@
 # backend/app/services/replay_simulator.py
+# FIX 1: switch_to_live() now explicitly sets _mode_override = "LIVE"
+#         so status()["mode"] immediately returns "LIVE" after stopping.
+#         Previously it set _mode_override = "LIVE" but _running was still
+#         True for a moment, causing the frontend to see stale replay state.
+# FIX 2: status() now returns "enabled": False when mode is LIVE,
+#         so the frontend button logic (isReplay = mode !== 'LIVE') works.
+# FIX 3: route geometry key was "route_geometry" but MainMap.jsx's
+#         buildRoutes() reads "geometry". Fixed to use "geometry".
 
 import asyncio
 import json
@@ -15,14 +23,17 @@ logger = logging.getLogger("dashboard.replay_simulator")
 class ReplaySimulator:
     def __init__(self) -> None:
         self.redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-        self.scenario_mode = os.getenv("SCENARIO_MODE", "LIVE")
+        # Store the scenario config from env, but don't activate replay on boot.
+        # Replay is activated explicitly via switch_to_replay().
+        self.replay_scenario_name = os.getenv("SCENARIO_MODE", "REPLAY_HISTORICAL")
         self.scenario_date = os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z")
 
-        self.replay_mode_name = (
-            self.scenario_mode if self.scenario_mode.startswith("REPLAY") else "REPLAY_HISTORICAL"
-        )
+        # Ensure replay_scenario_name is a valid replay mode name
+        if not self.replay_scenario_name.startswith("REPLAY"):
+            self.replay_scenario_name = "REPLAY_HISTORICAL"
 
-        self._mode_override: str | None = None
+        # Always start in LIVE mode — _mode_override drives current_mode
+        self._mode_override: str = "LIVE"
         self._redis: aioredis.Redis | None = None
         self._task: asyncio.Task | None = None
 
@@ -30,7 +41,6 @@ class ReplaySimulator:
         self._paused = False
         self._tick = 0
 
-        # Slower replay pacing to avoid UI blinking
         self.step_interval_seconds = float(os.getenv("REPLAY_STEP_INTERVAL_SECONDS", "15"))
         self.phase_gap_seconds = float(os.getenv("REPLAY_PHASE_GAP_SECONDS", "2"))
 
@@ -99,11 +109,12 @@ class ReplaySimulator:
 
     @property
     def current_mode(self) -> str:
-        return self._mode_override or self.scenario_mode
+        # _mode_override is always set (never None) — starts as "LIVE"
+        return self._mode_override
 
     @property
     def enabled(self) -> bool:
-        return self.current_mode.startswith("REPLAY")
+        return self._mode_override.startswith("REPLAY")
 
     async def start(self) -> None:
         if not self.enabled:
@@ -163,16 +174,20 @@ class ReplaySimulator:
 
     async def reset(self) -> None:
         self._tick = 0
-        logger.info("Replay simulator reset")
+        logger.info("Replay simulator reset to tick 0")
 
     async def switch_to_live(self) -> None:
-        await self.stop()
+        # FIX: set _mode_override BEFORE stopping so status() returns
+        # "LIVE" immediately — not after the async stop() completes.
         self._mode_override = "LIVE"
+        self._running = False
+        self._paused = False
+        await self.stop()
         logger.info("Switched replay simulator to LIVE mode")
 
     async def switch_to_replay(self) -> None:
-        was_live = self.current_mode == "LIVE"
-        self._mode_override = self.replay_mode_name
+        was_live = self._mode_override == "LIVE"
+        self._mode_override = self.replay_scenario_name
         if was_live:
             self._tick = 0
         await self.start()
@@ -181,6 +196,7 @@ class ReplaySimulator:
     def status(self) -> dict:
         return {
             "mode": self.current_mode,
+            # FIX: enabled must reflect current_mode, not just scenario_mode
             "enabled": self.enabled,
             "running": self._running,
             "paused": self._paused,
@@ -209,8 +225,11 @@ class ReplaySimulator:
             lon, lat = self._jitter(team["base"][0], team["base"][1], 0.015, 0.015)
             payload = {
                 "team_id": team["team_id"],
+                "volunteer_id": team["team_id"],
                 "latitude": lat,
                 "longitude": lon,
+                "lat": lat,
+                "lon": lon,
                 "status": "en_route" if self._tick % 3 else "ready",
                 "skills": team["skills"],
                 "equipment": team["equipment"],
@@ -232,6 +251,8 @@ class ReplaySimulator:
             "district": zone["zone_name"],
             "latitude": lat,
             "longitude": lon,
+            "lat": lat,
+            "lon": lon,
             "severity": zone["severity"],
             "urgency": zone["severity"],
             "credibility": 0.92,
@@ -251,11 +272,13 @@ class ReplaySimulator:
             "dispatch_id": f"ROUTE-{self._tick:03d}",
             "mission_id": f"MISSION-{self._tick:03d}",
             "team_id": team["team_id"],
+            "volunteer_id": team["team_id"],
             "status": "ASSIGNED" if self._tick % 2 else "EN_ROUTE",
             "eta_minutes": 12 + (self._tick % 8),
             "distance_km": round(4.5 + (self._tick % 5) * 1.7, 1),
             "zone_name": zone["zone_name"],
-            "route_geometry": {
+            # FIX: was "route_geometry" but MainMap.jsx buildRoutes() reads "geometry"
+            "geometry": {
                 "type": "LineString",
                 "coordinates": [
                     [start_lon, start_lat],

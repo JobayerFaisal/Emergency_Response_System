@@ -11,3 +11,46 @@ ami valo acii
 
 
 new WebSocket("ws://localhost:8005/ws")
+
+
+docker exec -it disaster_postgres psql -U postgres -d disaster_response -c "
+DELETE FROM flood_predictions;
+DELETE FROM weather_data;
+DELETE FROM social_media_posts;
+DELETE FROM sentinel_zones;
+
+INSERT INTO sentinel_zones (name, center, radius_km, risk_level, population_density, elevation, drainage_capacity)
+VALUES
+  ('Sylhet Sadar',  ST_SetSRID(ST_MakePoint(91.8720, 24.8975), 4326), 5.0, 'critical', 45000, 3.5, 'poor'),
+  ('Gowainghat',    ST_SetSRID(ST_MakePoint(92.0167, 25.1000), 4326), 5.5, 'critical', 18000, 4.0, 'poor'),
+  ('Companiganj',   ST_SetSRID(ST_MakePoint(91.6333, 25.0333), 4326), 5.0, 'critical', 22000, 3.0, 'poor'),
+  ('Kanaighat',     ST_SetSRID(ST_MakePoint(92.2667, 24.9667), 4326), 5.0, 'critical', 20000, 3.5, 'poor'),
+  ('Jaintiapur',    ST_SetSRID(ST_MakePoint(92.1500, 25.1333), 4326), 4.5, 'high',     16000, 5.0, 'poor'),
+  ('Beanibazar',    ST_SetSRID(ST_MakePoint(92.0167, 24.7500), 4326), 4.5, 'high',     24000, 4.0, 'poor'),
+  ('Zakiganj',      ST_SetSRID(ST_MakePoint(92.0333, 24.6000), 4326), 4.5, 'high',     19000, 4.5, 'poor'),
+  ('Fenchuganj',    ST_SetSRID(ST_MakePoint(91.8667, 24.7167), 4326), 5.0, 'high',     21000, 3.0, 'poor'),
+  ('Golapganj',     ST_SetSRID(ST_MakePoint(92.0000, 24.8000), 4326), 4.0, 'moderate', 26000, 5.5, 'moderate'),
+  ('Balaganj',      ST_SetSRID(ST_MakePoint(91.9000, 24.7667), 4326), 4.0, 'moderate', 23000, 6.0, 'moderate'),
+  ('Bishwanath',    ST_SetSRID(ST_MakePoint(91.6500, 24.8667), 4326), 4.0, 'moderate', 27000, 6.5, 'moderate'),
+  ('Osmaninagar',   ST_SetSRID(ST_MakePoint(91.7833, 24.8333), 4326), 3.5, 'low',      20000, 8.0, 'moderate'),
+  ('Dakshinsurma',  ST_SetSRID(ST_MakePoint(91.8200, 24.8500), 4326), 3.5, 'low',      22000, 7.5, 'moderate');
+
+SELECT name, risk_level, elevation FROM sentinel_zones ORDER BY risk_level, name;
+"
+
+
+
+
+
+import os
+
+SCENARIO_MODE = os.getenv("SCENARIO_MODE", "LIVE")
+SCENARIO_DATE = os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z")
+
+IS_REPLAY = SCENARIO_MODE.startswith("REPLAY")
+
+def is_replay():
+    return IS_REPLAY
+
+def get_scenario_date():
+    return SCENARIO_DATE

@@ -1,6 +1,4 @@
-// frontend/src/hooks/useDashboard.js
-
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const KPI_URL = '/api/kpi'
 const AGENT_URLS = {
@@ -9,7 +7,8 @@ const AGENT_URLS = {
   agent3: '/api/agents/agent3',
   agent4: '/api/agents/agent4',
 }
-const POLL_INTERVAL_MS = 15_000
+
+const POLL_INTERVAL_MS = 30000  // Default to 30 seconds for live feel
 
 export default function useDashboard({ paused = false } = {}) {
   const [kpi, setKpi] = useState({})
@@ -20,12 +19,19 @@ export default function useDashboard({ paused = false } = {}) {
     agent4: null,
   })
 
+  const pausedRef = useRef(paused)
+  useEffect(() => {
+    pausedRef.current = paused
+  }, [paused])
+
   const fetchAll = useCallback(async () => {
+    if (pausedRef.current) return
+
     try {
       const res = await fetch(KPI_URL)
       if (res.ok) setKpi(await res.json())
     } catch {
-      // ignore
+      // ignore network errors silently
     }
 
     const results = await Promise.allSettled(
@@ -55,7 +61,11 @@ export default function useDashboard({ paused = false } = {}) {
     fetchAll()
     const interval = setInterval(fetchAll, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [fetchAll, paused])
+  }, [paused, fetchAll])
 
-  return { kpi, agents, refreshDashboard: fetchAll }
+  const manualRefresh = () => {
+    fetchAll()
+  }
+
+  return { kpi, agents, refreshDashboard: manualRefresh }
 }

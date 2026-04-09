@@ -1,5 +1,3 @@
-// frontend/src/App.jsx
-
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import KPIBar from './components/layout/KPIBar.jsx'
 import Sidebar from './components/layout/Sidebar.jsx'
@@ -108,7 +106,7 @@ export default function App() {
 
   useEffect(() => {
     loadReplayStatus()
-    const timer = setInterval(loadReplayStatus, 15000)
+    const timer = setInterval(loadReplayStatus, 30000)  // Adjusted to 30 seconds
     return () => clearInterval(timer)
   }, [loadReplayStatus])
 
@@ -117,6 +115,11 @@ export default function App() {
       refreshDashboard()
     }
   }, [isReplay, refreshDashboard])
+
+  // Manual refresh function
+  const handleManualRefresh = () => {
+    refreshDashboard()
+  }
 
   return (
     <div className="app-shell" style={{ position: 'relative' }}>
@@ -263,6 +266,11 @@ export default function App() {
           agents={agents}
         />
       </div>
+
+      {/* Manual Refresh Button */}
+      <button onClick={handleManualRefresh} style={buttonStyle('#059669')}>
+        Refresh Now
+      </button>
     </div>
   )
 }
