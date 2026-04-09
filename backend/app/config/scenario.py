@@ -5,8 +5,16 @@ from typing import Optional
 # SCENARIO_MODE env var defines *which* replay scenario is available,
 # but the app always boots into LIVE mode. Replay is only activated
 # when the user clicks "Historical Replay" in the UI.
-_REPLAY_SCENARIO_NAME = os.getenv("SCENARIO_MODE", "REPLAY_HISTORICAL")
-_REPLAY_SCENARIO_DATE = os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z")
+#
+# FIX: The shared .env file uses VITE_-prefixed names for frontend vars.
+# Docker passes the same .env to backend services via env_file, so the
+# backend only receives the VITE_ variants. We check both forms so that
+# a single .env works for both frontend and backend without duplication.
+def _get_env(key: str, default: str) -> str:
+    return os.getenv(key) or os.getenv(f"VITE_{key}") or default
+
+_REPLAY_SCENARIO_NAME = _get_env("SCENARIO_MODE", "REPLAY_HISTORICAL")
+_REPLAY_SCENARIO_DATE = _get_env("SCENARIO_DATE", "2022-06-17T09:00:00Z")
 
 _SCENARIO_STATE = {
     "mode": "LIVE",  # always start LIVE — never read mode from env

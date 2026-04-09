@@ -53,7 +53,7 @@ export default function App() {
     paused: isReplay,
     resetToken: eventResetToken,
   })
-  const { kpi, agents, refreshDashboard } = useDashboard({ paused: isReplay })
+  const { kpi, agents, refreshDashboard } = useDashboard({ paused: isReplay, events })
   const { zones } = useZones()
 
   const scenarioLabel = useMemo(

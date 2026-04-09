@@ -20,6 +20,8 @@ import asyncpg
 from fastapi import APIRouter, Depends
 
 from app.services.db import get_db
+from app.config.scenario import is_replay
+from app.services.redis_bridge import _redis as _get_redis
 
 logger = logging.getLogger("dashboard.routers.kpi")
 
@@ -216,7 +218,21 @@ async def get_agent2(conn: asyncpg.Connection = Depends(get_db)) -> Dict[str, An
     """
     Shape expected by Agent2Panel.jsx:
     { reports[], clusters{}, total_reports, critical_reports }
+
+    FIX: In replay mode, return empty reports so the DB data from previous
+    runs does not bleed into the replay view. Distress pins are driven
+    exclusively by WS events (distress_queue channel) during replay.
     """
+
+    # In replay mode suppress DB rows — WS events from the simulator
+    # are the single source of truth for distress pins.
+    if is_replay():
+        return {
+            "reports": [],
+            "clusters": {},
+            "total_reports": 0,
+            "critical_reports": 0,
+        }
 
     # Pull recent resource_allocations as "incidents" (what Agent2 processes)
     rows = await conn.fetch("""
@@ -246,7 +262,6 @@ async def get_agent2(conn: asyncpg.Connection = Depends(get_db)) -> Dict[str, An
             "status":      r["status"],
         })
 
-    # Cluster by zone
     clusters = {}
     for rep in reports:
         key = rep["district"] or "unknown"
@@ -269,7 +284,22 @@ async def get_agent3(conn: asyncpg.Connection = Depends(get_db)) -> Dict[str, An
     """
     Shape expected by Agent3Panel.jsx:
     { inventory[], volunteers[], total_volunteers, available_volunteers, deployed_volunteers }
+
+    FIX: In replay mode, return zero inventory so old deployed counts from
+    the DB don't show. The replay simulator publishes inventory_update events
+    over WS that the frontend Agent3Panel reads via the useDashboard hook.
+    In LIVE mode, read from the DB as normal.
     """
+
+    if is_replay():
+        # Return zeroed inventory in replay — WS events drive the panel
+        return {
+            "inventory": [],
+            "volunteers": [],
+            "total_volunteers": 0,
+            "available_volunteers": 0,
+            "deployed_volunteers": 0,
+        }
 
     # Resource summary
     inv_rows = await conn.fetch("""

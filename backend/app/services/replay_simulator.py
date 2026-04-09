@@ -25,8 +25,16 @@ class ReplaySimulator:
         self.redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
         # Store the scenario config from env, but don't activate replay on boot.
         # Replay is activated explicitly via switch_to_replay().
-        self.replay_scenario_name = os.getenv("SCENARIO_MODE", "REPLAY_HISTORICAL")
-        self.scenario_date = os.getenv("SCENARIO_DATE", "2022-06-17T09:00:00Z")
+        # FIX: Check both SCENARIO_MODE and VITE_SCENARIO_MODE. The shared
+        # .env uses VITE_ prefix (for Vite/frontend), but Docker passes the
+        # same file to backend services via env_file — so the backend only
+        # receives VITE_-prefixed vars unless non-prefixed ones are also set.
+        self.replay_scenario_name = (
+            os.getenv("SCENARIO_MODE") or os.getenv("VITE_SCENARIO_MODE") or "REPLAY_HISTORICAL"
+        )
+        self.scenario_date = (
+            os.getenv("SCENARIO_DATE") or os.getenv("VITE_SCENARIO_DATE") or "2022-06-17T09:00:00Z"
+        )
 
         # Ensure replay_scenario_name is a valid replay mode name
         if not self.replay_scenario_name.startswith("REPLAY"):
@@ -291,13 +299,17 @@ class ReplaySimulator:
         await self._publish("route_assignment", payload)
 
     async def _emit_inventory_update(self) -> None:
+        # BUG WAS: max(10, ...) and max(40, ...) etc. prevented inventory
+        # from ever reaching 0 even after many ticks. Removed the floors
+        # so resources can fully deplete during replay, showing realistic
+        # "critical shortage" states.
         payload = {
             "zone_name": "Sylhet Logistics Hub",
-            "boats_available": 6 - (self._tick % 3),
-            "medical_kits": max(10, 42 - self._tick),
-            "food_packs": max(40, 180 - (self._tick * 3)),
-            "water_units": max(50, 260 - (self._tick * 4)),
-            "status": "depleting" if self._tick > 3 else "stable",
+            "boats_available": max(0, 6 - (self._tick % 4)),
+            "medical_kits": max(0, 42 - self._tick * 2),
+            "food_packs": max(0, 180 - (self._tick * 5)),
+            "water_units": max(0, 260 - (self._tick * 7)),
+            "status": "critical" if self._tick > 8 else ("depleting" if self._tick > 3 else "stable"),
             "timestamp": self._now(),
         }
         await self._publish("inventory_update", payload)
