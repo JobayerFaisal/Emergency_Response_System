@@ -7,7 +7,6 @@ import RiverLayer from './RiverLayer.jsx'
 import DistressPins from './DistressPins.jsx'
 import TeamMarkers from './TeamMarkers.jsx'
 import RouteMap from './RouteMap.jsx'
-import RainLayer from './RainLayer.jsx'
 
 const DEFAULT_CENTER = [91.8687, 24.8949]
 const DEFAULT_ZOOM = 9
@@ -182,7 +181,6 @@ export default function MainMap({ zones, activeLayers, agents, events }) {
         </>
       )}
 
-      <RainLayer active={activeLayers.rain} intensity={avgRisk} />
     </div>
   )
 }

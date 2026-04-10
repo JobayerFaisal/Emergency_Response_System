@@ -4,7 +4,6 @@ import React from 'react'
 
 const LAYERS = [
   { key: 'flood',  label: 'Flood Zones', icon: '🌊' },
-  { key: 'rain',   label: 'Rain Overlay', icon: '🌧' },
   { key: 'river',  label: 'River Levels', icon: '〰' },
   { key: 'teams',  label: 'Teams', icon: '👥' },
   { key: 'pins',   label: 'Distress Pins', icon: '📍' },

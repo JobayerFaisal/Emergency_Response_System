@@ -415,7 +415,7 @@ function PageSystem({ kpi, agents, events, connected, zones }) {
 // ── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [activePage, setActivePage] = useState('map')
-  const [activeLayers, setActiveLayers] = useState({ flood:true, rain:true, teams:true, pins:true, river:true, routes:true })
+  const [activeLayers, setActiveLayers] = useState({ flood:true, rain:false, teams:true, pins:true, river:true, routes:true })
   const [replayState, setReplayState] = useState({ mode:'LIVE', enabled:false, running:false, paused:false, tick:0, scenario_date:'' })
   const [replayBusy, setReplayBusy] = useState(false)
   const [eventResetToken, setEventResetToken] = useState(0)
