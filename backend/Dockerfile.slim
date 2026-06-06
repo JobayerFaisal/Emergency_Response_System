@@ -1,0 +1,27 @@
+# ============================================================
+# Dockerfile.slim
+# Used by: Agent 2, Agent 3, Agent 4, Dashboard API
+# Final image size: ~400-500 MB
+# ============================================================
+
+FROM python:3.12-slim AS base
+
+# Only the OS packages these agents actually need
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy and install only base requirements
+COPY requirements.base.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.base.txt
+
+# Copy backend source
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

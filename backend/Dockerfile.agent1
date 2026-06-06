@@ -1,0 +1,47 @@
+# ============================================================
+# Dockerfile.agent1
+# Used by: Agent 1 (Environmental Intelligence) ONLY
+# Final image size: ~3.5-4 GB (TF-CPU + GEE + geo stack)
+#
+# Why separate?
+#   - tensorflow-cpu alone is ~600 MB
+#   - earthengine-api + geemap + rasterio + geopandas adds ~1 GB
+#   - GDAL system libs add ~300 MB
+#   - Agents 2/3/4 need NONE of this
+# ============================================================
+
+FROM python:3.12-slim AS base
+
+# System packages needed for GDAL, rasterio, psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    gdal-bin \
+    libgdal-dev \
+    libgeos-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ── Layer 1: base deps (changes rarely) ──────────────────────
+COPY requirements.base.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.base.txt
+
+# ── Layer 2: heavy ML/GEE deps (changes rarely) ──────────────
+# Install tensorflow-cpu first (large, benefits from its own layer)
+RUN pip install --no-cache-dir tensorflow-cpu==2.16.1
+
+# Install GEE + geospatial stack
+COPY requirements.agent1.txt .
+RUN pip install --no-cache-dir -r requirements.agent1.txt
+
+# ── Layer 3: source code (changes often — kept last) ─────────
+COPY . .
+
+EXPOSE 8001
+CMD ["uvicorn", "backend.src.agents.agent_1_environmental.main:app", \
+     "--host", "0.0.0.0", "--port", "8001"]

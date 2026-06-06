@@ -63,11 +63,15 @@ from backend.app.config.scenario import set_redis_client
 # FIX 1: Force UTF-8 on the stream handler so emoji characters (✅ etc.)
 # don't crash on Windows consoles that default to cp1252 encoding.
 _utf8_stream = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
+import pathlib as _pathlib
+_log_dir = _pathlib.Path(os.getenv('LOG_DIR', '/var/log/amas'))
+_log_dir.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('agent_1_environmental.log', encoding='utf-8'),
+        logging.FileHandler(_log_dir / 'agent_1_environmental.log', encoding='utf-8'),
         logging.StreamHandler(_utf8_stream),
     ]
 )
@@ -115,20 +119,24 @@ class AgentConfig:
 
         # Tell type checkers these values are non-None after validation
         self.openweather_api_key = cast(str, self.openweather_api_key)
-        self.openai_api_key = cast(str, self.openai_api_key)
+        # openai_api_key may legitimately be None — don't cast
     
     def _validate(self):
-        """Validate required configuration — Twitter and Redis are optional"""
-        required = {
-            'OPENWEATHER_API_KEY': self.openweather_api_key,
-            'OPENAI_API_KEY': self.openai_api_key,
-        }
+        """Validate required configuration — Twitter, OpenAI, and Redis are optional."""
+        if not self.openweather_api_key:
+            raise ValueError(
+                "Missing required configuration: OPENWEATHER_API_KEY. "
+                "Set it in your .env file."
+            )
 
-        missing = [k for k, v in required.items() if not v]
-        if missing:
-            raise ValueError(f"Missing required configuration: {', '.join(missing)}")
+        # OpenAI is used only for LLM enrichment of social media posts.
+        # The agent runs in degraded mode without it — NLP enrichment is skipped.
+        if not self.openai_api_key:
+            logger.warning(
+                "OPENAI_API_KEY not set — LLM enrichment of social media posts "
+                "will be disabled. All other monitoring functions remain active."
+            )
 
-        # FIX 2d: Warn about optional services instead of crashing
         if not self.twitter_bearer_token:
             logger.warning("TWITTER_BEARER_TOKEN not set — social media collection disabled")
 
@@ -259,9 +267,14 @@ class EnvironmentalIntelligenceAgent:
             logger.info("Data collectors initialized")
             
             # Initialize data processors
-            self.llm_processor = LLMEnrichmentProcessor(
-                api_key=cast(str, self.config.openai_api_key)
-            )
+            # LLM enrichment is optional — only created when an OpenAI key is available.
+            if self.config.openai_api_key:
+                self.llm_processor = LLMEnrichmentProcessor(
+                    api_key=cast(str, self.config.openai_api_key)
+                )
+            else:
+                logger.warning("LLM enrichment disabled — no OPENAI_API_KEY provided")
+                self.llm_processor = None
             
             self.weather_normalizer = WeatherDataNormalizer()
             self.social_analyzer = SocialMediaAnalyzer()

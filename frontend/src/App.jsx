@@ -412,6 +412,267 @@ function PageSystem({ kpi, agents, events, connected, zones }) {
   )
 }
 
+// ── Page 4: Citizen Reporter ──────────────────────────────────────────────────
+function PageCitizen() {
+  const [form, setForm] = useState({ name: '', phone: '', category: 'Flooding', message: '' })
+  const [pin, setPin]   = useState(null)   // { lat, lon }
+  const [status, setStatus] = useState(null) // null | 'submitting' | 'ok' | 'error'
+  const [errorMsg, setErrorMsg] = useState('')
+  const mapRef = React.useRef(null)
+  const leafletRef = React.useRef(null)
+
+  // Initialise Leaflet map once
+  useEffect(() => {
+    if (leafletRef.current) return
+    if (!window.L) return
+    const map = window.L.map(mapRef.current, {
+      center: [24.0, 91.5], zoom: 8,
+      zoomControl: true,
+    })
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map)
+    let marker = null
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng
+      setPin({ lat: +lat.toFixed(6), lon: +lng.toFixed(6) })
+      if (marker) marker.remove()
+      marker = window.L.marker([lat, lng]).addTo(map)
+        .bindPopup(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`).openPopup()
+    })
+    leafletRef.current = map
+  }, [])
+
+  const field = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const submit = async () => {
+    if (!pin)              { setErrorMsg('Click the map to pick a location first.'); setStatus('error'); return }
+    if (!form.name.trim()) { setErrorMsg('Name is required.'); setStatus('error'); return }
+    if (!form.message.trim()) { setErrorMsg('Please describe the situation.'); setStatus('error'); return }
+    setStatus('submitting')
+    setErrorMsg('')
+    try {
+      const res = await fetch('/api/citizen-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, latitude: pin.lat, longitude: pin.lon }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setStatus('ok')
+      setForm({ name: '', phone: '', category: 'Flooding', message: '' })
+      setPin(null)
+    } catch (e) {
+      setErrorMsg(e.message)
+      setStatus('error')
+    }
+  }
+
+  const CATEGORIES = ['Flooding', 'Medical Emergency', 'Rescue Needed', 'Road Blockage', 'Building Collapse', 'Fire', 'Other']
+
+  return (
+    <div className="page-citizen">
+      <div className="page-citizen-header">
+        <div>
+          <h2 className="page-title">📣 Citizen Reporter</h2>
+          <p className="page-subtitle">Click the map to pin your location, fill in the details, and submit a ground-level report.</p>
+        </div>
+      </div>
+
+      <div className="citizen-layout">
+        {/* Map picker */}
+        <div className="citizen-map-wrap">
+          {!window.L && (
+            <div className="citizen-map-loading">Loading map…</div>
+          )}
+          <div ref={mapRef} className="citizen-map" />
+          {pin && (
+            <div className="citizen-pin-badge">
+              📍 {pin.lat}, {pin.lon}
+            </div>
+          )}
+          {!pin && (
+            <div className="citizen-pin-hint">Click anywhere on the map to set your location</div>
+          )}
+        </div>
+
+        {/* Form */}
+        <div className="citizen-form-card">
+          {status === 'ok' && (
+            <div className="citizen-alert citizen-alert--ok">
+              ✅ Report submitted! Our agents will process it shortly.
+            </div>
+          )}
+          {status === 'error' && (
+            <div className="citizen-alert citizen-alert--err">
+              ⚠ {errorMsg}
+            </div>
+          )}
+
+          <div className="citizen-field">
+            <label className="citizen-label">Your name *</label>
+            <input className="citizen-input" value={form.name} onChange={e => field('name', e.target.value)} placeholder="Full name" />
+          </div>
+
+          <div className="citizen-field">
+            <label className="citizen-label">Phone number</label>
+            <input className="citizen-input" value={form.phone} onChange={e => field('phone', e.target.value)} placeholder="+880 …" />
+          </div>
+
+          <div className="citizen-field">
+            <label className="citizen-label">Emergency type</label>
+            <select className="citizen-input citizen-select" value={form.category} onChange={e => field('category', e.target.value)}>
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className="citizen-field">
+            <label className="citizen-label">Describe the situation *</label>
+            <textarea className="citizen-input citizen-textarea" rows={4} value={form.message}
+              onChange={e => field('message', e.target.value)}
+              placeholder="How many people? Water level? Access routes blocked?" />
+          </div>
+
+          <button
+            className="citizen-submit"
+            onClick={submit}
+            disabled={status === 'submitting'}
+          >
+            {status === 'submitting' ? 'Submitting…' : '🚨 Submit Report'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Page 5: Risk Validation Results ───────────────────────────────────────────
+function PageReports() {
+  const [reports, setReports] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')  // all | pending | validated
+  const [search, setSearch] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/citizen-reports?limit=50')
+      if (res.ok) {
+        const data = await res.json()
+        setReports(data.reports || [])
+      }
+    } catch { /* ignore */ }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const filtered = useMemo(() => {
+    let r = reports
+    if (filter === 'pending')   r = r.filter(x => x.status === 'pending')
+    if (filter === 'validated') r = r.filter(x => x.status !== 'pending')
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      r = r.filter(x => (x.name||'').toLowerCase().includes(q) || (x.category||'').toLowerCase().includes(q) || (x.message||'').toLowerCase().includes(q))
+    }
+    return r
+  }, [reports, filter, search])
+
+  const riskColor = (lvl) => ({ low:'#22c55e', moderate:'#f59e0b', high:'#ef4444', critical:'#ef4444', extreme:'#ef4444' }[lvl] || '#3d5266')
+  const statusBg  = (s) => s === 'pending' ? '#3d5266' : '#22c55e22'
+  const statusCol = (s) => s === 'pending' ? '#8aa0bc' : '#22c55e'
+
+  return (
+    <div className="page-reports">
+      <div className="page-reports-header">
+        <div>
+          <h2 className="page-title">🛡 Citizen Reports &amp; Risk Validation</h2>
+          <p className="page-subtitle">Ground-level reports submitted by citizens, cross-validated by Agent 1's flood risk model.</p>
+        </div>
+        <button className="btn btn--blue" onClick={load} disabled={loading}>
+          {loading ? '…' : '↻ Refresh'}
+        </button>
+      </div>
+
+      {/* Toolbar */}
+      <div className="reports-toolbar">
+        <div className="reports-filters">
+          {['all','pending','validated'].map(f => (
+            <button key={f}
+              className={`filter-tab ${filter === f ? 'filter-tab--active' : ''}`}
+              onClick={() => setFilter(f)}>
+              {f === 'all' ? 'All' : f === 'pending' ? '⏳ Pending' : '✅ Validated'}
+            </button>
+          ))}
+        </div>
+        <input
+          className="reports-search"
+          placeholder="Search name, category, message…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Cards */}
+      {loading && <div className="reports-loading">Loading reports…</div>}
+      {!loading && filtered.length === 0 && (
+        <div className="reports-empty">
+          {reports.length === 0
+            ? 'No citizen reports yet. Use the Citizen Reporter page to submit one.'
+            : 'No reports match the current filter.'}
+        </div>
+      )}
+
+      <div className="reports-grid">
+        {filtered.map((r, i) => (
+          <div key={i} className="report-card-v2">
+            <div className="rcv2-header">
+              <span className="rcv2-category">{r.category}</span>
+              <span className="rcv2-status" style={{ background: statusBg(r.status), color: statusCol(r.status) }}>
+                {r.status || 'pending'}
+              </span>
+              <span className="rcv2-time">{r.created_at ? new Date(r.created_at).toLocaleString('en-BD',{month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</span>
+            </div>
+
+            <div className="rcv2-body">
+              <div className="rcv2-meta">
+                <span className="rcv2-name">👤 {r.name || '—'}</span>
+                {r.phone && <span className="rcv2-phone">📞 {r.phone}</span>}
+                {r.latitude != null && <span className="rcv2-coords">📍 {(+r.latitude).toFixed(4)}, {(+r.longitude).toFixed(4)}</span>}
+              </div>
+              <p className="rcv2-message">"{r.message}"</p>
+            </div>
+
+            {/* Validation block — shown when Agent 1 has processed it */}
+            {r.flood_risk_level && (
+              <div className="rcv2-validation">
+                <div className="rcv2-val-title">Agent 1 Risk Assessment</div>
+                <div className="rcv2-val-row">
+                  <span className="rcv2-val-label">Flood risk</span>
+                  <span className="rcv2-val-badge" style={{ color: riskColor(r.flood_risk_level), borderColor: riskColor(r.flood_risk_level)+'44', background: riskColor(r.flood_risk_level)+'15' }}>
+                    {(r.flood_risk_level||'').toUpperCase()}
+                  </span>
+                </div>
+                {r.risk_score != null && (
+                  <div className="rcv2-val-row">
+                    <span className="rcv2-val-label">Risk score</span>
+                    <div className="rcv2-score-bar">
+                      <div className="rcv2-score-fill" style={{ width: `${r.risk_score}%`, background: riskColor(r.flood_risk_level) }}/>
+                      <span className="rcv2-score-num">{r.risk_score}/100</span>
+                    </div>
+                  </div>
+                )}
+                {r.validation_notes && (
+                  <p className="rcv2-notes">{r.validation_notes}</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [activePage, setActivePage] = useState('map')
@@ -462,9 +723,11 @@ export default function App() {
   useEffect(() => { if (!isReplay) refreshDashboard() }, [isReplay, refreshDashboard])
 
   const NAV_PAGES = [
-    { id: 'map',    icon: '🗺',  label: 'Live Map' },
-    { id: 'agents', icon: '🤖', label: 'Agent Panels' },
-    { id: 'system', icon: '⚙',  label: 'System Overview' },
+    { id: 'map',     icon: '🗺',  label: 'Live Map' },
+    { id: 'agents',  icon: '🤖', label: 'Agent Panels' },
+    { id: 'system',  icon: '⚙',  label: 'System Overview' },
+    { id: 'citizen', icon: '📣', label: 'Citizen Reporter' },
+    { id: 'reports', icon: '🛡',  label: 'Reports' },
   ]
 
   return (
@@ -502,6 +765,8 @@ export default function App() {
         )}
         {activePage === 'agents' && <PageAgents agents={agents} events={events} />}
         {activePage === 'system' && <PageSystem kpi={kpi} agents={agents} events={events} connected={connected} zones={zones} />}
+        {activePage === 'citizen' && <PageCitizen />}
+        {activePage === 'reports' && <PageReports />}
       </div>
     </div>
   )

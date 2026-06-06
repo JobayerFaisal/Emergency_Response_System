@@ -460,3 +460,329 @@
 
 /* ── Sidebar tweak — remove from map page when on other pages ── */
 /* The Sidebar component is only rendered inside PageMap */
+/* ═══════════════════════════════════════════════════════════
+   Page 4: Citizen Reporter
+   ═══════════════════════════════════════════════════════════ */
+
+.page-citizen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px 20px 0;
+  gap: 12px;
+}
+
+.page-citizen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.citizen-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.citizen-map-wrap {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border2);
+}
+
+.citizen-map {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+}
+
+.citizen-map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg2);
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.citizen-pin-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: var(--bg1);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--accent);
+  font-family: var(--mono);
+  z-index: 500;
+}
+
+.citizen-pin-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(9,13,18,0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--secondary);
+  white-space: nowrap;
+  z-index: 500;
+  pointer-events: none;
+}
+
+.citizen-form-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.citizen-alert {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+}
+.citizen-alert--ok  { background: #22c55e18; border: 1px solid #22c55e44; color: #22c55e; }
+.citizen-alert--err { background: #ef444418; border: 1px solid #ef444444; color: #ef4444; }
+
+.citizen-field { display: flex; flex-direction: column; gap: 5px; }
+
+.citizen-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--secondary);
+  text-transform: uppercase;
+}
+
+.citizen-input {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  color: var(--primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.citizen-input:focus { border-color: var(--accent); }
+.citizen-select { cursor: pointer; }
+.citizen-textarea { resize: vertical; min-height: 80px; }
+
+.citizen-submit {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 0;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: 4px;
+}
+.citizen-submit:hover { opacity: 0.85; }
+.citizen-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════
+   Page 5: Reports & Risk Validation
+   ═══════════════════════════════════════════════════════════ */
+
+.page-reports {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px 20px 0;
+  gap: 12px;
+}
+
+.page-reports-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.reports-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.reports-filters { display: flex; gap: 6px; }
+
+.reports-search {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  color: var(--primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  width: 240px;
+}
+.reports-search:focus { border-color: var(--accent); }
+
+.reports-loading,
+.reports-empty {
+  color: var(--secondary);
+  font-size: 13px;
+  padding: 32px 0;
+  text-align: center;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.report-card-v2 {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rcv2-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+
+.rcv2-category {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  flex: 1;
+}
+
+.rcv2-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rcv2-time {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.rcv2-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+
+.rcv2-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.rcv2-message {
+  font-size: 13px;
+  color: var(--primary);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.rcv2-validation {
+  margin: 0 14px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rcv2-val-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--secondary);
+  text-transform: uppercase;
+}
+
+.rcv2-val-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rcv2-val-label {
+  font-size: 12px;
+  color: var(--secondary);
+  min-width: 70px;
+}
+
+.rcv2-val-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  letter-spacing: 0.05em;
+}
+
+.rcv2-score-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.rcv2-score-fill {
+  height: 6px;
+  border-radius: 3px;
+  transition: width 0.4s;
+}
+
+.rcv2-score-num {
+  font-size: 11px;
+  color: var(--secondary);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.rcv2-notes {
+  font-size: 12px;
+  color: var(--secondary);
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
