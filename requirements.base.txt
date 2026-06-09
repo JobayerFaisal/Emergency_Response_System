@@ -1,0 +1,47 @@
+# ============================================================
+# requirements.base.txt
+# Shared by: Agent 2, Agent 3, Agent 4, Dashboard API
+# ~200 MB image layer
+# ============================================================
+
+# Web framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+pydantic-settings==2.3.0
+python-multipart==0.0.9
+
+# Database
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.30
+alembic==1.13.1
+geoalchemy2==0.15.1
+
+# Redis
+redis[asyncio]==5.0.4
+
+# HTTP client
+httpx==0.27.0
+aiohttp==3.9.5
+requests==2.32.3
+
+# Geospatial (lightweight)
+shapely==2.0.4
+geopy==2.4.1
+
+# Utilities
+python-dotenv==1.0.1
+python-dateutil==2.9.0
+numpy==1.26.4
+pandas==2.2.2
+
+# Logging
+python-json-logger==2.0.7
+
+# WebSocket
+websockets==12.0
+
+# Testing (needed to run tests inside containers)
+pytest==8.2.0
+pytest-asyncio==0.23.7
