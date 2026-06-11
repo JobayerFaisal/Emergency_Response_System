@@ -20,6 +20,7 @@ from .services.db import init_db, close_db
 from .services.redis_bridge import init_redis, close_redis, start_bridge, stop_bridge, redis_ok
 from .services.replay_simulator import ReplaySimulator
 from .routers import dashboard, zones, predictions, distress, resources, dispatch
+from .routers import citizen_reports as citizen_reports_router
 from .routers import kpi as kpi_router
 from .websocket import router as ws_router
 from .config.scenario import set_mode, get_replay_scenario_name
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(distress.router)
     app.include_router(resources.router)
     app.include_router(dispatch.router)
+    app.include_router(citizen_reports_router.router)
     app.include_router(ws_router)
 
     @app.get("/")

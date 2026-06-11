@@ -3,14 +3,9 @@
    Import this in main.jsx alongside global.css
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-
-/* Override font for sharper ops-terminal feel */
-:root {
-  --font: 'IBM Plex Sans', sans-serif;
-  --mono: 'IBM Plex Mono', monospace;
-  --display: 'Rajdhani', sans-serif;
-}
+/* pages.css — uses font vars already defined in global.css */
+/* --font: Space Grotesk  |  --mono: JetBrains Mono  (from global.css) */
+/* --display falls back to --font */
 
 /* ── Page nav ──────────────────────────────────────────────── */
 .page-nav {
@@ -76,7 +71,7 @@
 
 /* ── Page titles ───────────────────────────────────────────── */
 .page-title {
-  font-family: var(--display);
+  font-family: var(--font);
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -235,7 +230,7 @@
 }
 
 .aic-title {
-  font-family: var(--display);
+  font-family: var(--font);
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -344,7 +339,7 @@
 }
 .sys-kpi-card:hover { border-color: var(--border2); }
 .sys-kpi-icon { font-size: 22px; }
-.sys-kpi-val  { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: 0.03em; }
+.sys-kpi-val  { font-family: var(--font); font-size: 26px; font-weight: 700; letter-spacing: 0.03em; }
 .sys-kpi-label{ font-size: 11px; color: var(--secondary); letter-spacing: 0.04em; }
 
 /* Cards */
@@ -785,4 +780,24 @@
   line-height: 1.5;
   border-top: 1px solid var(--border);
   padding-top: 8px;
+}
+
+/* ── Filter tabs (used in PageReports) ─────────────────── */
+.filter-tab {
+  padding: 5px 14px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--secondary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.filter-tab:hover { background: var(--bg2); color: var(--primary); }
+.filter-tab--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }

@@ -6,12 +6,12 @@
 
 /* ── Popup ─────────────────────────────────────────────── */
 .maplibregl-popup-content {
-  background: var(--bg-2) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--border-hi);
+  background: var(--bg2) !important;
+  color: var(--primary) !important;
+  border: 1px solid var(--border2);
   border-radius: 6px !important;
   padding: 10px 14px !important;
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: 13px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
   min-width: 160px;
@@ -25,22 +25,22 @@
 }
 
 .maplibregl-popup-tip {
-  border-top-color: var(--border-hi) !important;
+  border-top-color: var(--border2) !important;
 }
 
 .maplibregl-popup-close-button {
-  color: var(--text-muted) !important;
+  color: var(--muted) !important;
   font-size: 16px !important;
   padding: 4px 8px !important;
 }
 .maplibregl-popup-close-button:hover {
-  color: var(--text-primary) !important;
-  background: var(--bg-3) !important;
+  color: var(--primary) !important;
+  background: var(--bg3) !important;
 }
 
 /* ── Navigation controls ───────────────────────────────── */
 .maplibregl-ctrl-group {
-  background: var(--bg-1) !important;
+  background: var(--bg1) !important;
   border: 1px solid var(--border) !important;
   border-radius: 6px !important;
   overflow: hidden;
@@ -56,7 +56,7 @@
   border-bottom: none !important;
 }
 .maplibregl-ctrl-group button:hover {
-  background: var(--bg-3) !important;
+  background: var(--bg3) !important;
 }
 
 .maplibregl-ctrl-icon {
@@ -76,9 +76,9 @@
 /* ── Attribution ───────────────────────────────────────── */
 .maplibregl-ctrl-attrib {
   background: rgba(7, 11, 18, 0.6) !important;
-  color: var(--text-muted) !important;
+  color: var(--muted) !important;
   font-size: 9px !important;
 }
 .maplibregl-ctrl-attrib a {
-  color: var(--text-muted) !important;
+  color: var(--muted) !important;
 }

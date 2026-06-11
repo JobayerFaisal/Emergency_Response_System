@@ -683,7 +683,9 @@ export default function App() {
 
   const isReplay = replayState.mode !== 'LIVE'
 
-  const { events, connected } = useWebSocket('ws://localhost:8005/ws', { paused: isReplay, resetToken: eventResetToken })
+  // Use relative WS URL so Vite proxy handles it in dev, and nginx handles it in production
+  const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`
+  const { events, connected } = useWebSocket(wsUrl, { paused: isReplay, resetToken: eventResetToken })
   const { kpi, agents, refreshDashboard } = useDashboard({ paused: isReplay, events })
   const { zones } = useZones()
 
