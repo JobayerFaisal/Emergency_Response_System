@@ -1,230 +1,80 @@
-# ============================================================
-# Emergency Response System — Full Docker Compose
-# Usage:  docker-compose up --build
-#
-# Image sizes after split:
-#   agent1          ~3.5 GB  (TF-CPU + GEE + GDAL — unavoidable)
-#   agent2          ~450 MB  (slim FastAPI + asyncpg + redis)
-#   agent3          ~450 MB  (slim FastAPI + asyncpg + redis)
-#   agent4          ~450 MB  (slim FastAPI + asyncpg + redis)
-#   dashboard_api   ~450 MB  (slim FastAPI)
-#   frontend        ~50  MB  (nginx static)
-#   postgres        ~400 MB
-#   redis           ~30  MB
-#   Total:          ~6–7 GB  (was ~50 GB with single bloated image)
-#
-# Profiles:
-#   (default)  — all real agents
-#   mock       — replace agent1+2 with mock_publisher for offline dev
-# ============================================================
+# docker-compose.yml — AMAS Emergency Response System
+# Schema fix: postgres now mounts /database/init/ for first-boot migration,
+# and has a health-check so Agent 1 waits for postgres to be ready.
 
 services:
 
-  # ── Infrastructure ─────────────────────────────────────────
+  # ── Infrastructure ────────────────────────────────────────────────────────
 
   postgres:
     image: postgis/postgis:15-3.3
     container_name: disaster_postgres
     environment:
-      POSTGRES_DB:               disaster_response
-      POSTGRES_USER:             postgres
-      POSTGRES_PASSWORD:         postgres
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB:       disaster_response
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/database:/docker-entrypoint-initdb.d
-    networks:
-      - disaster_network
+      # FIX: Mount init script + SQL files so postgres applies them on first boot.
+      # Postgres runs /docker-entrypoint-initdb.d/ files ONCE on a fresh volume.
+      - ./backend/database/init/00_run_all.sh:/docker-entrypoint-initdb.d/00_run_all.sh
+      - ./backend/database:/docker-entrypoint-initdb.d/sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d disaster_response"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12          # Wait up to 60s for postgres to be ready
+      start_period: 10s
+    networks:
+      - disaster_network
 
   redis:
     image: redis:7-alpine
     container_name: disaster_redis
     ports:
       - "6379:6379"
-    command: redis-server --timeout 0 --tcp-keepalive 60
-    networks:
-      - disaster_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Agent 1 — Environmental Intelligence ──────────────────
-  # Heavy image: TensorFlow-CPU + GEE + GDAL stack
-  # Build context = project root so backend/models/*.keras are accessible
-  # PYTHONPATH = /app  →  "backend.src.agents..." resolves correctly
-
-  agent1:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile.agent1
-    container_name: agent1_environmental
-    profiles: ["", "full"]          # excluded from "mock" profile
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-    environment:
-      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
-      FLOOD_MODEL_PATH:   /app/backend/models/flood_fast_best.keras
-      SAR_REF_START:      "2024-01-01"
-      SAR_REF_END:        "2024-04-06"
-    env_file: [ .env ]
-    ports:
-      - "8001:8001"
-    volumes:
-      - .:/app
-      # Mount your GEE credentials from the host.
-      # On Linux/Mac:  ~/.config/earthengine
-      # On Windows:    %APPDATA%/earthengine  →  map to same container path
-      - ${GEE_CREDENTIALS_DIR:-~/.config/earthengine}:/root/.config/earthengine:ro
-      - ./logs:/var/log/amas
+      interval: 5s
+      timeout: 3s
+      retries: 6
     networks:
       - disaster_network
-    command: >
-      uvicorn backend.src.agents.agent_1_environmental.main:app
-      --host 0.0.0.0 --port 8001
-    restart: unless-stopped
 
-  # ── Agent 2 — Distress Intelligence ───────────────────────
-  # Slim image: FastAPI + asyncpg + redis only (~450 MB)
-
-  agent2:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.slim
-    container_name: agent2_distress
-    profiles: ["", "full"]          # excluded from "mock" profile
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-      agent1:   { condition: service_started }
-    environment:
-      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
-    env_file: [ .env ]
-    ports:
-      - "8002:8002"
-    volumes:
-      - ./backend:/app
-      - ./logs:/var/log/amas
-    networks:
-      - disaster_network
-    command: >
-      uvicorn src.agents.agent_2_distress.main:app
-      --host 0.0.0.0 --port 8002
-    restart: unless-stopped
-
-  # ── Agent 3 — Resource Management ─────────────────────────
-  # Slim image: FastAPI + asyncpg + redis only (~450 MB)
-
-  agent3:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.slim
-    container_name: agent3_resource
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-    environment:
-      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
-    env_file: [ .env ]
-    ports:
-      - "8003:8003"
-    volumes:
-      - ./backend:/app
-      - ./logs:/var/log/amas
-    networks:
-      - disaster_network
-    command: >
-      uvicorn src.agents.agent_3_resource.main:app
-      --host 0.0.0.0 --port 8003
-    restart: unless-stopped
-
-  # ── Agent 4 — Dispatch Optimization ───────────────────────
-  # Slim image: FastAPI + asyncpg + redis + httpx (~450 MB)
-
-  agent4:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.slim
-    container_name: agent4_dispatch
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-      agent3:   { condition: service_started }
-    environment:
-      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:          redis://redis:6379
-      # Public OSRM for routing. Falls back to Haversine if unavailable.
-      OSRM_URL:           http://router.project-osrm.org
-      PYTHONPATH:         /app
-    env_file: [ .env ]
-    ports:
-      - "8004:8004"
-    volumes:
-      - ./backend:/app
-      - ./logs:/var/log/amas
-    networks:
-      - disaster_network
-    command: >
-      uvicorn src.agents.agent_4_dispatch.main:app
-      --host 0.0.0.0 --port 8004
-    restart: unless-stopped
-
-  # ── Dashboard API ──────────────────────────────────────────
-  # Slim image — only proxies between frontend and agents
-  # PYTHONPATH = /app  →  "app.*" resolves to backend/app/
+  # ── Dashboard API (serves React frontend + WebSocket) ────────────────────
 
   dashboard_api:
     build:
       context: ./backend
       dockerfile: Dockerfile.slim
     container_name: dashboard_api
+    command: >
+      uvicorn app.main:app
+        --host 0.0.0.0
+        --port 8005
+        --reload
     depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      postgres:
+        condition: service_healthy   # Wait for postgres health-check to pass
+      redis:
+        condition: service_healthy
     environment:
-      DATABASE_URL:       postgresql://postgres:postgres@postgres:5432/disaster_response
-      DATABASE_URL_ASYNC: postgresql://postgres:postgres@postgres:5432/disaster_response
-      REDIS_URL:          redis://redis:6379
-      PYTHONPATH:         /app
-      AGENT1_URL:         http://agent1_environmental:8001
-      AGENT2_URL:         http://agent2_distress:8002
-      AGENT3_URL:         http://agent3_resource:8003
-      AGENT4_URL:         http://agent4_dispatch:8004
-      CORS_ORIGINS:       "http://localhost:3000,http://frontend:3000,http://disaster_frontend:3000"
-    env_file: [ .env ]
+      DATABASE_URL:  postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:     redis://redis:6379/0
+      DASHBOARD_PORT: "8005"
+      CORS_ORIGINS:  "http://localhost:3000,http://localhost:5173,http://frontend:3000"
+    env_file:
+      - .env
     ports:
       - "8005:8005"
     volumes:
       - ./backend:/app
-      - ./logs:/var/log/amas
     networks:
       - disaster_network
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0 --port 8005
-    restart: unless-stopped
 
-  # ── Frontend ───────────────────────────────────────────────
-  # ~50 MB nginx static build
+  # ── React Frontend ────────────────────────────────────────────────────────
 
   frontend:
     build:
@@ -235,37 +85,104 @@ services:
       - dashboard_api
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     networks:
       - disaster_network
-    restart: unless-stopped
 
-  # ── Mock Publisher (offline dev) ───────────────────────────
-  # Run with:  docker-compose --profile mock up
-  # Replaces Agents 1+2 — publishes realistic flood alerts directly
-  # to Redis so Agents 3+4 can be developed/tested without GEE/Twitter.
+  # ── Agent 1 (Environmental Intelligence — heavy TF + GEE image) ──────────
 
-  mock_publisher:
+  agent1:
     build:
       context: ./backend
-      dockerfile: Dockerfile.slim
-    container_name: mock_publisher
-    profiles: ["mock"]
+      dockerfile: Dockerfile.agent1
+    container_name: agent1_environmental
+    command: >
+      uvicorn backend.src.agents.agent_1_environmental.main:app
+        --host 0.0.0.0
+        --port 8001
+        --reload
     depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
+      postgres:
+        condition: service_healthy   # FIX: was depends_on without condition
+      redis:
+        condition: service_healthy
     environment:
-      REDIS_URL:   redis://redis:6379
-      PYTHONPATH:  /app
-      # Change scenario: mirpur_flood | sylhet_flood | multi_zone | all
-      MOCK_SCENARIO: "${MOCK_SCENARIO:-multi_zone}"
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:    redis://redis:6379/0
+      LOG_DIR:      /var/log/amas
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
     volumes:
       - ./backend:/app
     networks:
       - disaster_network
-    command: >
-      python -m mock_agents.mock_publisher
-      --scenario ${MOCK_SCENARIO:-multi_zone}
-    restart: "no"
+
+  # ── Agent 2 (Distress Intelligence) ──────────────────────────────────────
+
+  agent2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.slim
+    container_name: agent2_distress
+    command: python -m backend.src.agents.agent_2_distress.main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:    redis://redis:6379/0
+    env_file:
+      - .env
+    networks:
+      - disaster_network
+
+  # ── Agent 3 (Resource Management) ────────────────────────────────────────
+
+  agent3:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.slim
+    container_name: agent3_resource
+    command: python -m backend.src.agents.agent_3_resource.main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:    redis://redis:6379/0
+    env_file:
+      - .env
+    networks:
+      - disaster_network
+
+  # ── Agent 4 (Dispatch Optimization) ──────────────────────────────────────
+
+  agent4:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.slim
+    container_name: agent4_dispatch
+    command: python -m backend.src.agents.agent_4_dispatch.main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disaster_response
+      REDIS_URL:    redis://redis:6379/0
+    env_file:
+      - .env
+    networks:
+      - disaster_network
 
 volumes:
   postgres_data:

@@ -194,12 +194,38 @@ class EnvironmentalIntelligenceAgent:
         
         try:
             # Initialize database connection pool
-            self.db_pool = await asyncpg.create_pool(
-                self.config.database_url,
-                min_size=5,
-                max_size=20
-            )
-            logger.info("Database connection pool created")
+            # Retry loop: postgres container may not be ready when Agent 1 starts.
+            # Docker depends_on only waits for the container to START, not for
+            # postgres to finish its initialization — so we retry with backoff.
+            _max_attempts = 10
+            _attempt = 0
+            while True:
+                try:
+                    self.db_pool = await asyncpg.create_pool(
+                        self.config.database_url,
+                        min_size=5,
+                        max_size=20,
+                        # Fast-fail per attempt so we don't block the retry loop
+                        command_timeout=10,
+                    )
+                    # Verify the connection is actually usable
+                    async with self.db_pool.acquire() as _conn:
+                        await _conn.fetchval("SELECT 1")
+                    logger.info("Database connection pool created")
+                    break
+                except Exception as _db_err:
+                    _attempt += 1
+                    if _attempt >= _max_attempts:
+                        logger.error(
+                            f"Database not reachable after {_max_attempts} attempts: {_db_err}"
+                        )
+                        raise
+                    _wait = min(5 * _attempt, 30)  # 5s, 10s, 15s … capped at 30s
+                    logger.warning(
+                        f"Database not ready (attempt {_attempt}/{_max_attempts}), "
+                        f"retrying in {_wait}s… ({_db_err})"
+                    )
+                    await asyncio.sleep(_wait)
             
             # FIX 3: Redis is optional — if it's not running locally we skip caching
             # gracefully instead of crashing. All cache reads/writes already have
